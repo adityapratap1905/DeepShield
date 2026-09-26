@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepshield-model"
+version = "0.1.0"
+description = "AI-generated image and face-manipulation detectors for DeepShield"
+requires-python = ">=3.11"
+dependencies = [
+  "Pillow>=10,<13",
+  "numpy>=1.26,<3",
+  "onnxruntime>=1.27,<2",
+  "opencv-python-headless>=4.10,<5",
+]
+
+[project.optional-dependencies]
+train = [
+  "torch>=2.6,<3",
+  "torchvision>=0.21,<1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

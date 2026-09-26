@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/deepshield_model/__init__.py
+src/deepshield_model/architecture.py
+src/deepshield_model/community_forensics.py
+src/deepshield_model/face_manipulation.py
+src/deepshield_model/inference.py
+src/deepshield_model.egg-info/PKG-INFO
+src/deepshield_model.egg-info/SOURCES.txt
+src/deepshield_model.egg-info/dependency_links.txt
+src/deepshield_model.egg-info/requires.txt
+src/deepshield_model.egg-info/top_level.txt

@@ -1,0 +1,27 @@
+# Flutter and Dart generated state
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Platform and IDE local state
+**/local.properties
+**/.idea/
+**/*.iml
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/android/.gradle/
+**/.DS_Store
+**/Thumbs.db
+
+# Python environments and generated caches for future backend/model work
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+model/data/deepfake_faces/
+model/artifacts/
