@@ -149,7 +149,7 @@ class FullReportScreen extends StatelessWidget {
                       result.extraData?['face_manipulation_prediction'] != null)
                     _InfoRow(
                       'Faces analyzed',
-                      '${result.extraData?['faces_analyzed'] ?? 0} of ${result.extraData?['faces_detected'] ?? 0} detected',
+                      _faceCoverage,
                       isDark,
                     ),
                   _InfoRow('Latency', '${result.scanDurationMs} ms', isDark),
@@ -225,6 +225,20 @@ class FullReportScreen extends StatelessWidget {
       'no_face_detected' => 'Not run — no face detected',
       _ => 'Unavailable',
     };
+  }
+
+  String get _faceCoverage {
+    if (result.extraData?['face_manipulation_prediction'] ==
+        'no_face_detected') {
+      return 'No face detected; check not run';
+    }
+
+    final detected =
+        (result.extraData?['faces_detected'] as num?)?.toInt() ?? 0;
+    final analyzed =
+        (result.extraData?['faces_analyzed'] as num?)?.toInt() ?? 0;
+    if (detected == 0) return 'Face count unavailable';
+    return 'Analyzed $analyzed of $detected detected faces';
   }
 }
 

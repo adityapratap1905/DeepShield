@@ -85,12 +85,15 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
                 color: textPrimary, fontWeight: FontWeight.w700, fontSize: 20)),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.all(24),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
               _FileDropZone(
+                file: _selectedFile,
                 fileName: _fileName,
                 fileSize: _fileSize,
                 isDark: isDark,
@@ -100,16 +103,21 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
               _PhotoPrototypeNotice(isDark: isDark),
               const SizedBox(height: 24),
               const _SupportedTypes().animate().fadeIn(delay: 200.ms),
-              const Spacer(),
-              DSButton(
-                label: 'Analyze Photo',
-                onPressed: _selectedFile == null ? null : _scan,
-                isFullWidth: true,
-                leadingIcon: Icons.radar_rounded,
-              ).animate().fadeIn(delay: 300.ms),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
             ],
           ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          child: DSButton(
+            label: 'Analyze Photo',
+            onPressed: _selectedFile == null ? null : _scan,
+            isFullWidth: true,
+            leadingIcon: Icons.radar_rounded,
+          ).animate().fadeIn(delay: 300.ms),
         ),
       ),
     );
@@ -142,12 +150,14 @@ class _PhotoPrototypeNotice extends StatelessWidget {
 }
 
 class _FileDropZone extends StatelessWidget {
+  final File? file;
   final String? fileName;
   final int? fileSize;
   final bool isDark;
   final VoidCallback onTap;
 
   const _FileDropZone({
+    required this.file,
     required this.fileName,
     required this.fileSize,
     required this.isDark,
@@ -225,8 +235,23 @@ class _FileDropZone extends StatelessWidget {
                           color: AppColors.warning.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child:
-                            Icon(_fileIcon, color: AppColors.warning, size: 30),
+                        child: file == null
+                            ? Icon(_fileIcon,
+                                color: AppColors.warning, size: 30)
+                            : ClipRRect(
+                                borderRadius: BorderRadius.circular(15),
+                                child: Image.file(
+                                  file!,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 180,
+                                  cacheHeight: 180,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(_fileIcon,
+                                          color: AppColors.warning, size: 30),
+                                ),
+                              ),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -268,7 +293,7 @@ class _FileDropZone extends StatelessWidget {
                               fontSize: 16,
                               fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
-                      Text('JPG and PNG photos',
+                      Text('JPG and PNG · up to 15 MB',
                           style: TextStyle(color: textTertiary, fontSize: 12)),
                     ],
                   ),
@@ -284,6 +309,7 @@ class _SupportedTypes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     const types = [
       ('Photos: JPG, PNG', Icons.image_rounded, AppColors.warning),
     ];
@@ -291,8 +317,15 @@ class _SupportedTypes extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Supported file types',
-            style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
+        Text(
+          'Supported file types',
+          style: TextStyle(
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+            fontSize: 13,
+          ),
+        ),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,

@@ -14,7 +14,10 @@ class ScanResultScreen extends StatelessWidget {
   final ScanResultModel result;
   const ScanResultScreen({super.key, required this.result});
 
-  bool get _isSafe => result.isSafe;
+  bool get _isSafe =>
+      !result.isDemo &&
+      _aiPrediction == 'no_ai_generation_signal' &&
+      _facePrediction == 'no_face_manipulation_signal';
 
   String? get _aiPrediction => result.extraData?['prediction'] as String?;
   String get _aiCheckStatus => switch (_aiPrediction) {
@@ -44,11 +47,10 @@ class ScanResultScreen extends StatelessWidget {
       _facePrediction == 'face_manipulation_signal';
 
   Color _getPrimaryColor(bool isDark) {
-    if (_isSafe) return isDark ? AppColors.success : AppColors.successLight;
-    if (result.threatLevel == ThreatLevel.high ||
-        result.threatLevel == ThreatLevel.critical) {
+    if (_hasManipulationSignal) {
       return isDark ? AppColors.danger : AppColors.dangerLight;
     }
+    if (_isSafe) return isDark ? AppColors.success : AppColors.successLight;
     return isDark ? AppColors.warning : AppColors.warningLight;
   }
 
@@ -137,6 +139,8 @@ class ScanResultScreen extends StatelessWidget {
                       aiCheckStatus: _aiCheckStatus,
                       faceScore: _faceManipulationScore,
                       faceCheckStatus: _faceCheckStatus,
+                      faceCheckWasSkipped:
+                          _facePrediction == 'no_face_detected',
                       facesDetected: _facesDetected,
                       facesAnalyzed: _facesAnalyzed,
                       isDark: isDark,
@@ -209,8 +213,9 @@ class ScanResultScreen extends StatelessWidget {
                         if (_facePrediction != null)
                           _DetailRow(
                             label: 'Faces analyzed',
-                            value:
-                                '$_facesAnalyzed of $_facesDetected detected',
+                            value: _facePrediction == 'no_face_detected'
+                                ? 'No face detected; check not run'
+                                : 'Analyzed $_facesAnalyzed of $_facesDetected detected faces',
                             isDark: isDark,
                           ),
                       ],
@@ -396,6 +401,7 @@ class _ModelScoreCard extends StatelessWidget {
   final String aiCheckStatus;
   final double? faceScore;
   final String faceCheckStatus;
+  final bool faceCheckWasSkipped;
   final int facesDetected;
   final int facesAnalyzed;
   final bool isDark;
@@ -406,6 +412,7 @@ class _ModelScoreCard extends StatelessWidget {
     required this.aiCheckStatus,
     required this.faceScore,
     required this.faceCheckStatus,
+    required this.faceCheckWasSkipped,
     required this.facesDetected,
     required this.facesAnalyzed,
     required this.isDark,
@@ -489,7 +496,11 @@ class _ModelScoreCard extends StatelessWidget {
             )
           else
             Text(
-              'Faces analyzed: $facesAnalyzed of $facesDetected detected.',
+              faceCheckWasSkipped
+                  ? 'No face was detected, so this check could not run.'
+                  : facesDetected > 0
+                      ? 'Analyzed $facesAnalyzed of $facesDetected detected faces.'
+                      : 'A face-analysis score was not returned.',
               style: TextStyle(
                 color: isDark
                     ? AppColors.textSecondaryDark
