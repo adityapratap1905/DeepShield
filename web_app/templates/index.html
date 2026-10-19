@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepShield AI</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #080d18;
+  color: #f1f5ff;
+}
+
+header {
+  padding: 22px 8%;
+  border-bottom: 1px solid #263249;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo { font-size: 25px; font-weight: bold; }
+.logo span { color: #78a2ff; }
+
+.status { color: #6ee7a5; font-size: 13px; }
+
+main {
+  max-width: 780px;
+  margin: 65px auto;
+  padding: 20px;
+}
+
+.tag { color: #82a9ff; letter-spacing: 3px; font-size: 12px; }
+
+h1 { font-size: clamp(38px, 7vw, 58px); line-height: 1.1; }
+h1 span { color: #78a2ff; }
+
+.subtitle { color: #a7b3c9; line-height: 1.7; }
+
+.panel {
+  margin-top: 35px;
+  padding: 28px;
+  background: #111b2d;
+  border: 1px solid #293852;
+  border-radius: 20px;
+}
+
+.drop {
+  padding: 35px 15px;
+  border: 2px dashed #405579;
+  border-radius: 15px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop:hover { border-color: #78a2ff; }
+
+.symbol { font-size: 40px; }
+.muted { color: #9baac3; font-size: 13px; }
+
+#preview {
+  display: none;
+  max-width: 100%;
+  max-height: 260px;
+  margin: 15px auto 0;
+  border-radius: 12px;
+}
+
+button {
+  width: 100%;
+  padding: 15px;
+  margin-top: 18px;
+  background: #78a2ff;
+  color: #081020;
+  font-weight: bold;
+  font-size: 15px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+button:disabled { opacity: .6; }
+
+#result {
+  display: none;
+  margin-top: 20px;
+  padding: 18px;
+  background: #091221;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+
+footer {
+  text-align: center;
+  padding: 25px;
+  color: #71809a;
+  font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="logo">◈ Deep<span>Shield</span></div>
+  <div class="status">● AI API</div>
+</header>
+
+<main>
+  <div class="tag">AI-POWERED IMAGE ANALYSIS</div>
+  <h1>Discover the truth<br>behind <span>every image.</span></h1>
+  <p class="subtitle">
+    Upload an image and let DeepShield analyze whether it
+    appears real or fake using your trained AI model.
+  </p>
+
+  <section class="panel">
+    <h2>Analyze an image</h2>
+    <p class="muted">Select a JPG or PNG image to get started.</p>
+
+    <div class="drop" id="drop">
+      <div class="symbol">⇧</div>
+      <p id="fileText">Click here to select an image</p>
+      <input id="imageInput" type="file" accept="image/*" hidden>
+      <img id="preview" alt="Image preview">
+    </div>
+
+    <button id="analyze">Analyze Image</button>
+    <div id="result" aria-live="polite"></div>
+  </section>
+</main>
+
+<footer>DeepShield AI · Predictions are estimates, not proof of authenticity.</footer>
+
+<script>
+const input = document.getElementById("imageInput");
+const drop = document.getElementById("drop");
+const preview = document.getElementById("preview");
+const fileText = document.getElementById("fileText");
+const result = document.getElementById("result");
+const analyze = document.getElementById("analyze");
+
+drop.addEventListener("click", () => input.click());
+
+input.addEventListener("change", () => {
+  const file = input.files[0];
+  if (!file) return;
+
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = "block";
+  fileText.textContent = file.name;
+  result.style.display = "none";
+});
+
+analyze.addEventListener("click", async () => {
+  const file = input.files[0];
+
+  if (!file) {
+    alert("Please select an image first.");
+    return;
+  }
+
+  analyze.disabled = true;
+  analyze.textContent = "Analyzing...";
+  result.style.display = "block";
+  result.textContent = "Please wait while DeepShield analyzes your image.";
+
+  try {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const response = await fetch("/predict", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error || "Prediction failed");
+
+    result.replaceChildren();
+
+    const heading = document.createElement("h2");
+    heading.textContent = "Prediction: " + data.prediction.toUpperCase();
+
+    const confidence = document.createElement("p");
+    confidence.textContent = "Confidence: " + data.confidence + "%";
+
+    const note = document.createElement("p");
+    note.className = "muted";
+    note.textContent = "AI predictions may be incorrect.";
+
+    result.append(heading, confidence, note);
+  } catch (error) {
+    result.textContent = "Error: " + error.message;
+  } finally {
+    analyze.disabled = false;
+    analyze.textContent = "Analyze Image";
+  }
+});
+</script>
+</body>
+</html>
