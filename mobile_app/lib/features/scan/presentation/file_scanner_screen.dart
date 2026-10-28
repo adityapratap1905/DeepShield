@@ -100,7 +100,7 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
                 onTap: _pickFile,
               ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0),
               const SizedBox(height: 24),
-              _PhotoPrototypeNotice(isDark: isDark),
+              _PhotoQualityNotice(isDark: isDark),
               const SizedBox(height: 24),
               const _SupportedTypes().animate().fadeIn(delay: 200.ms),
               const SizedBox(height: 24),
@@ -124,10 +124,10 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
   }
 }
 
-class _PhotoPrototypeNotice extends StatelessWidget {
+class _PhotoQualityNotice extends StatelessWidget {
   final bool isDark;
 
-  const _PhotoPrototypeNotice({required this.isDark});
+  const _PhotoQualityNotice({required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -141,9 +141,29 @@ class _PhotoPrototypeNotice extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
       ),
-      child: Text(
-        'Photos are checked for AI-generation signals and face manipulations such as swaps. Model scores are estimates, not proof; the face check needs a detectable face.',
-        style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tips_and_updates_outlined, color: textColor, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Get a clearer check',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Use an original, sharp, well-lit photo with the face unobstructed. Heavy compression or filters can reduce useful detail. If no face is detected, the face check is skipped; that does not mean the image is authentic. Model scores are estimates, not proof.',
+            style: TextStyle(color: textColor, fontSize: 13, height: 1.45),
+          ),
+        ],
       ),
     );
   }

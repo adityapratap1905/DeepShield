@@ -9,7 +9,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/ds_button.dart';
 import '../../../core/widgets/ds_text_field.dart';
 import '../../../routes/app_router.dart';
-import '../providers/scan_provider.dart';
 /// URL Scanner screen — paste URL, validate, scan, navigate to result
 class UrlScannerScreen extends ConsumerStatefulWidget {
   const UrlScannerScreen({super.key});
@@ -32,7 +31,6 @@ class _UrlScannerScreenState extends ConsumerState<UrlScannerScreen> {
   @override
   void dispose() {
     _urlCtrl.dispose();
-    ref.read(scanProvider.notifier).reset();
     super.dispose();
   }
 

@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../models/scan_result_model.dart';
+import '../../history/data/history_repository.dart';
+import '../../history/providers/history_provider.dart';
 import '../data/scan_repository.dart';
 
 // ── Scan State ─────────────────────────────────────────────────────
@@ -40,14 +42,20 @@ final scanRepositoryProvider = Provider<ScanRepository>(
 );
 
 final scanProvider = StateNotifierProvider<ScanNotifier, ScanState>((ref) {
-  return ScanNotifier(ref.read(scanRepositoryProvider), ref);
+  return ScanNotifier(
+    ref.read(scanRepositoryProvider),
+    ref,
+    ref.read(historyRepositoryProvider),
+  );
 });
 
 class ScanNotifier extends StateNotifier<ScanState> {
   final ScanRepository _repo;
   final Ref _ref;
+  final HistoryRepository _historyRepository;
 
-  ScanNotifier(this._repo, this._ref) : super(ScanIdle());
+  ScanNotifier(this._repo, this._ref, this._historyRepository)
+      : super(ScanIdle());
 
   Future<void> scanUrl(String url) async {
     state = ScanLoading();
@@ -77,6 +85,12 @@ class ScanNotifier extends StateNotifier<ScanState> {
           }
         },
       );
+      try {
+        await _historyRepository.addScanResult(result, sourceFile: file);
+        _ref.invalidate(historyProvider);
+      } catch (_) {
+        // A history write should not discard a completed analysis result.
+      }
       state = ScanSuccess(result);
     } on Exception catch (e) {
       state = ScanError(e.toString().replaceAll('Exception: ', ''));

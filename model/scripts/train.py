@@ -1,177 +1,98 @@
-"""Fine-tune a ResNet-18 using a labeled, split image dataset."""
+"""Train and compare ImageNet-initialized image detectors on prepared FF++ frames."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import random
+import sys
 from pathlib import Path
 
-import torch
-from torch import nn
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+MODEL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(MODEL_ROOT / "src"))
 
-from deepshield_model.architecture import build_model
-from deepshield_model.inference import IMAGE_MEAN, IMAGE_SIZE, IMAGE_STD
+from deepshield_model.architecture import ARCHITECTURES
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path(__file__).resolve().parents[1] / "artifacts" / "deepfake_resnet18.pt",
+        "--data-dir", type=Path, default=MODEL_ROOT / "data" / "processed" / "images",
+        help="Prepared face-crop data root. Use processed/full_images to train on full frames.",
     )
-    parser.add_argument("--epochs", type=int, default=8)
-    parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--learning-rate", type=float, default=1e-4)
-    parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument("--view", choices=("face", "full"), default="face")
+    parser.add_argument(
+        "--architectures", nargs="+", choices=ARCHITECTURES,
+        default=["resnet18", "efficientnet_b0", "convnext_tiny"],
+    )
+    parser.add_argument("--output-dir", type=Path, default=MODEL_ROOT / "artifacts")
+    parser.add_argument("--report-dir", type=Path, default=MODEL_ROOT / "reports")
+    parser.add_argument("--image-size", type=int, default=224)
+    parser.add_argument("--stage1-epochs", type=int, default=2)
+    parser.add_argument("--stage2-epochs", type=int, default=8)
+    parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--workers", type=int, default=0)
+    parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--weight-decay", type=float, default=1e-2)
+    parser.add_argument("--patience", type=int, default=4)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--allow-cpu-convnext", action="store_true",
+        help="Allow the slow ConvNeXt-Tiny experiment on CPU; it is skipped by default without CUDA.",
+    )
     return parser.parse_args()
-
-
-def run_epoch(model, loader, loss_fn, device, threshold=0.5, optimizer=None):
-    training = optimizer is not None
-    model.train(training)
-    total_loss = 0.0
-    all_predictions = []
-    all_targets = []
-
-    for images, targets in loader:
-        images = images.to(device)
-        targets = targets.to(device)
-        if training:
-            optimizer.zero_grad(set_to_none=True)
-
-        with torch.set_grad_enabled(training):
-            logits = model(images)
-            loss = loss_fn(logits, targets)
-            if training:
-                loss.backward()
-                optimizer.step()
-
-        total_loss += loss.item() * images.size(0)
-        fake_probability = torch.softmax(logits.detach(), dim=1)[:, 0]
-        predictions = torch.where(
-            fake_probability >= threshold,
-            torch.zeros_like(targets),
-            torch.ones_like(targets),
-        )
-        all_predictions.append(predictions.cpu())
-        all_targets.append(targets.detach().cpu())
-
-    predictions = torch.cat(all_predictions)
-    targets = torch.cat(all_targets)
-    fake_index = 0  # ImageFolder sorts "fake" before "real".
-    true_positive = int(((predictions == fake_index) & (targets == fake_index)).sum())
-    false_positive = int(((predictions == fake_index) & (targets != fake_index)).sum())
-    false_negative = int(((predictions != fake_index) & (targets == fake_index)).sum())
-    precision = true_positive / max(true_positive + false_positive, 1)
-    recall = true_positive / max(true_positive + false_negative, 1)
-    f1 = 2 * precision * recall / max(precision + recall, 1e-12)
-    return {
-        "loss": total_loss / len(loader.dataset),
-        "accuracy": float((predictions == targets).float().mean()),
-        "fake_precision": precision,
-        "fake_recall": recall,
-        "fake_f1": f1,
-    }
 
 
 def main() -> None:
     args = parse_args()
-    if args.epochs < 1 or args.batch_size < 1:
-        raise SystemExit("--epochs and --batch-size must be positive.")
-    if not 0.0 < args.threshold < 1.0:
-        raise SystemExit("--threshold must be between 0 and 1.")
-    random.seed(42)
-    torch.manual_seed(42)
+    if args.stage1_epochs < 0 or args.stage2_epochs < 1:
+        raise SystemExit("--stage1-epochs must be non-negative and --stage2-epochs must be positive.")
+    if args.batch_size < 1 or args.workers < 0 or args.image_size < 64:
+        raise SystemExit("Use a positive batch size, non-negative workers, and image size of at least 64.")
+    if args.patience < 1 or args.learning_rate <= 0 or args.weight_decay < 0:
+        raise SystemExit("Invalid optimizer or early-stopping settings.")
 
-    train_transform = transforms.Compose(
-        [
-            transforms.Resize(256),
-            transforms.RandomCrop(IMAGE_SIZE),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(IMAGE_MEAN, IMAGE_STD),
-        ]
-    )
-    eval_transform = transforms.Compose(
-        [
-            transforms.Resize(256),
-            transforms.CenterCrop(IMAGE_SIZE),
-            transforms.ToTensor(),
-            transforms.Normalize(IMAGE_MEAN, IMAGE_STD),
-        ]
-    )
-    train_data = datasets.ImageFolder(args.data_dir / "train", transform=train_transform)
-    validation_data = datasets.ImageFolder(args.data_dir / "val", transform=eval_transform)
-    expected_classes = {"fake": 0, "real": 1}
-    if train_data.class_to_idx != expected_classes:
-        raise SystemExit("Training data must contain class folders 'fake' and 'real'.")
-    if validation_data.class_to_idx != expected_classes:
-        raise SystemExit("Validation data must contain class folders 'fake' and 'real'.")
+    import torch
+    from deepshield_model.training import finalize_best_model, train_one_model, write_comparison_csv
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if len(train_data) == 0 or len(validation_data) == 0:
-        raise SystemExit("Both train/ and val/ must contain labeled fake/ and real/ images.")
-    train_loader = DataLoader(
-        train_data, batch_size=args.batch_size, shuffle=True, num_workers=args.workers
-    )
-    validation_loader = DataLoader(
-        validation_data, batch_size=args.batch_size, shuffle=False, num_workers=args.workers
-    )
-    model = build_model(pretrained=True).to(device)
-    class_counts = torch.bincount(torch.tensor(train_data.targets), minlength=2).float()
-    validation_counts = torch.bincount(
-        torch.tensor(validation_data.targets), minlength=2
-    )
-    if torch.any(class_counts == 0) or torch.any(validation_counts == 0):
-        raise SystemExit("Both train/ and val/ must contain at least one fake and one real image.")
-    class_weights = class_counts.sum() / (2 * class_counts)
-    loss_fn = nn.CrossEntropyLoss(weight=class_weights.to(device))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    selected_architectures = list(dict.fromkeys(args.architectures))
+    if not torch.cuda.is_available() and not args.allow_cpu_convnext:
+        skipped = [name for name in selected_architectures if name == "convnext_tiny"]
+        selected_architectures = [name for name in selected_architectures if name != "convnext_tiny"]
+        if skipped:
+            print("Skipping ConvNeXt-Tiny because CUDA is unavailable; pass --allow-cpu-convnext to override.")
+    if not selected_architectures:
+        raise SystemExit("No model architecture is eligible for this machine.")
 
-    best_f1 = -1.0
-    best_metrics = None
-    for epoch in range(1, args.epochs + 1):
-        train_metrics = run_epoch(
-            model, train_loader, loss_fn, device, args.threshold, optimizer
+    results = []
+    for architecture in selected_architectures:
+        candidate_path = args.output_dir / f"deepfake_image_{args.view}_{architecture}_candidate.pt"
+        report_path = args.report_dir / "image_experiments" / f"{args.view}_{architecture}.json"
+        result = train_one_model(
+            architecture=architecture,
+            data_dir=args.data_dir,
+            output_path=candidate_path,
+            report_path=report_path,
+            view=args.view,
+            image_size=args.image_size,
+            stage1_epochs=args.stage1_epochs,
+            stage2_epochs=args.stage2_epochs,
+            batch_size=args.batch_size,
+            workers=args.workers,
+            learning_rate=args.learning_rate,
+            weight_decay=args.weight_decay,
+            patience=args.patience,
+            seed=args.seed,
         )
-        validation_metrics = run_epoch(
-            model, validation_loader, loss_fn, device, args.threshold
-        )
-        print(
-            json.dumps(
-                {
-                    "epoch": epoch,
-                    "train": train_metrics,
-                    "validation": validation_metrics,
-                    "device": str(device),
-                }
-            )
-        )
-        if validation_metrics["fake_f1"] > best_f1:
-            best_f1 = validation_metrics["fake_f1"]
-            best_metrics = validation_metrics
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            torch.save(
-                {
-                    "state_dict": model.state_dict(),
-                    "class_to_idx": train_data.class_to_idx,
-                    "threshold": args.threshold,
-                    "model_version": "resnet18-transfer-v1",
-                    "validation_metrics": validation_metrics,
-                },
-                args.output,
-            )
+        results.append(result)
 
-    metrics_path = args.output.with_suffix(".metrics.json")
-    metrics_path.write_text(json.dumps(best_metrics, indent=2), encoding="utf-8")
-    print(f"Saved best validation checkpoint to {args.output}")
-    print(f"Saved validation metrics to {metrics_path}")
+    args.report_dir.mkdir(parents=True, exist_ok=True)
+    comparison_path = args.report_dir / "image_model_comparison.csv"
+    write_comparison_csv(results, comparison_path)
+    (args.report_dir / "image_model_comparison.json").write_text(
+        json.dumps(results, indent=2) + "\n", encoding="utf-8"
+    )
+    selected = finalize_best_model(results, args.output_dir / "deepfake_image_best.pt")
+    print(json.dumps({"selected": selected, "comparison_csv": str(comparison_path)}, indent=2))
 
 
 if __name__ == "__main__":

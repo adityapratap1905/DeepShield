@@ -1,18 +1,21 @@
 # DeepShield
 
-DeepShield is a project to detect potentially manipulated or AI-generated photos and videos and help people assess media before sharing it. The first focus is a Flutter mobile app; a separate browser dashboard is planned for later.
+DeepShield analyzes potentially manipulated photos and videos. The repository keeps the Flutter client, FastAPI backend, model pipeline, and standalone browser dashboard in separate top-level folders.
 
 ## Repository structure
 
-- [`mobile_app/`](mobile_app/): Flutter mobile client and its platform folders.
-- [`backend/`](backend/): FastAPI photo upload and inference API.
-- [`model/`](model/): pretrained ONNX image and face-manipulation classifiers, face detector, download script, and optional ResNet-18 training pipeline.
-- [`web_app/`](web_app/): planned browser dashboard.
-- [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md): shared project context and workflow notes.
+- [`mobile_app/`](mobile_app/): Flutter client. It remains photo-first and uses the existing image endpoint.
+- [`backend/`](backend/): FastAPI upload API, including the existing pretrained photo analysis route and the FF++ image/video routes.
+- [`model/`](model/): preserved pretrained ONNX models plus the FaceForensics++ C23 frame preparation, training, evaluation, and inference pipeline.
+- [`web_app/`](web_app/): standalone Flask image dashboard. `mobile_app/web/` is Flutter platform support, not that dashboard.
+- [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md): shared architecture and workflow notes.
 
-The `mobile_app/web/` folder is generated as part of Flutter's platform support. It is not the separate `web_app/` dashboard.
+## Model status and setup
 
-## Current status
+The new pipeline trains one frame-level image detector using the official FaceForensics++ video splits, then analyzes sampled video frames with validation-calibrated aggregation. Raw videos, processed frames, and model weights are local artifacts and are excluded from Git. Experiment comparisons and metrics are written under `model/reports/`. No metrics should be reported until the corresponding training or evaluation command has produced them.
 
-The Flutter photo scan uploads to the FastAPI service in `backend/`, which runs pinned pretrained models without requiring a user-supplied dataset. It estimates AI-generation signals and checks detected face crops for face-manipulation signals, including some swaps. These outputs cannot prove authenticity or detect every edit. Model files are downloaded locally by the setup script and are excluded from Git. See [backend setup](backend/README.md) and [model details](model/README.md).
-# DeepShield
+Start with [`model/README.md`](model/README.md) for the official v4 EU2 C23 download, source-separated preparation, image model comparison, video aggregation calibration, test evaluation, and local inference commands. The existing pretrained ONNX models and their licenses are listed in [`model/THIRD_PARTY_MODEL.md`](model/THIRD_PARTY_MODEL.md).
+
+The backend setup and endpoints are documented in [`backend/README.md`](backend/README.md). The FF++ endpoints need a trained image checkpoint and a video config calibrated on validation videos. Until those artifacts exist, they report that the model is unavailable. The legacy photo route remains a separate pretrained ONNX analysis.
+
+The standalone dashboard setup and upload flow are documented in [`web_app/README.md`](web_app/README.md). Its bundled Keras model is a separate binary classifier; its training provenance is not documented here, so no performance claims are made for it.

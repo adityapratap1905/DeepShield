@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 
@@ -49,7 +52,8 @@ class StorageService {
     await _prefs.setBool(AppConstants.keyOnboardingDone, true);
   }
 
-  bool get isOnboardingDone => _prefs.getBool(AppConstants.keyOnboardingDone) ?? false;
+  bool get isOnboardingDone =>
+      _prefs.getBool(AppConstants.keyOnboardingDone) ?? false;
 
   // ── Theme ────────────────────────────────────────────────────────
   Future<void> saveThemeMode(String mode) async {
@@ -59,7 +63,8 @@ class StorageService {
   String get themeMode => _prefs.getString(AppConstants.keyThemeMode) ?? 'dark';
 
   // ── User Info ────────────────────────────────────────────────────
-  Future<void> saveUserInfo({required String name, required String email, required String id}) async {
+  Future<void> saveUserInfo(
+      {required String name, required String email, required String id}) async {
     await _prefs.setString(AppConstants.keyUserName, name);
     await _prefs.setString(AppConstants.keyUserEmail, email);
     await _prefs.setString(AppConstants.keyUserId, id);
@@ -86,5 +91,22 @@ class StorageService {
   Future<void> clearAll() async {
     await _prefs.clear();
     await _secure.deleteAll();
+    await _clearScanPreviews();
+  }
+
+  Future<void> _clearScanPreviews() async {
+    try {
+      final supportDirectory = await getApplicationSupportDirectory();
+      final previewDirectory = Directory(
+        '${supportDirectory.path}${Platform.pathSeparator}scan_history',
+      );
+      if (!await previewDirectory.exists()) return;
+
+      await for (final entry in previewDirectory.list(followLinks: false)) {
+        if (entry is File) await entry.delete();
+      }
+    } on FileSystemException {
+      // Logout can still clear credentials if preview cleanup fails.
+    }
   }
 }

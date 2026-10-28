@@ -1,18 +1,5 @@
-# Dataset layout
+# Local model data
 
-Keep your dataset out of source control. Arrange labeled images like this:
+Do not commit raw FaceForensics++ videos, extracted frames, uploaded media, or other training data. Dataset and processed-output directories are ignored by Git. Keep the official train/validation/test split metadata under `splits/official/`; the preparation script records its source commit and file hashes.
 
-```text
-deepfake_faces/
-  train/
-    fake/
-    real/
-  val/
-    fake/
-    real/
-  test/
-    fake/
-    real/
-```
-
-The training script consumes only `train/` and `val/`. Keep `test/` separate and use it once for final evaluation after model selection. Split by source/video/person before extracting frames so near-duplicate frames cannot leak between splits. Record dataset provenance, permissions, licenses, and limitations.
+Use the FaceForensics++ v4 downloader with `--server EU2` and C23 videos only. Keep the original FaceForensics v1 and DeepFakeDetection datasets out of the main training set. See [model setup](../README.md) for download, preparation, training, and evaluation commands.

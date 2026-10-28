@@ -79,9 +79,15 @@ class ScanResultScreen extends StatelessWidget {
     return 'No Strong AI-Generation Signal';
   }
 
-  String get _description => result.isDemo
-      ? 'No model analysis was performed, so this result says nothing about the image.'
-      : 'These model scores are estimates, not proof. The face check only evaluates detected face crops and can miss unfamiliar manipulations.';
+  String get _description {
+    if (result.isDemo) {
+      return 'No model analysis was performed, so this result says nothing about the image.';
+    }
+    if (_facePrediction == 'no_face_detected') {
+      return 'No face was detected, so face manipulation could not be assessed. Model estimates are not proof of authenticity.';
+    }
+    return 'These model scores are estimates, not proof. The face check only evaluates detected face crops.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +157,15 @@ class ScanResultScreen extends StatelessWidget {
                         .slideY(begin: 0.2, end: 0, delay: 100.ms),
 
                   const SizedBox(height: 16),
+
+                  if (!result.isDemo)
+                    _ResultGuidanceCard(
+                      faceCheckWasSkipped:
+                          _facePrediction == 'no_face_detected',
+                      isDark: isDark,
+                    ),
+
+                  if (!result.isDemo) const SizedBox(height: 16),
 
                   // Threat details
                   _DetailCard(
@@ -509,6 +524,67 @@ class _ModelScoreCard extends StatelessWidget {
                 height: 1.4,
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultGuidanceCard extends StatelessWidget {
+  final bool faceCheckWasSkipped;
+  final bool isDark;
+
+  const _ResultGuidanceCard({
+    required this.faceCheckWasSkipped,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final guidance = faceCheckWasSkipped
+        ? 'No face was detected, so face manipulation was not assessed. Try a sharp, well-lit original with the face visible. The missing face result does not mean the image is authentic.'
+        : 'Scores are model estimates, not calibrated probabilities or proof. A model can miss edits or flag an authentic image. Check the original source before relying on this result.';
+
+    return DSCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            faceCheckWasSkipped
+                ? Icons.visibility_off_rounded
+                : Icons.info_outline_rounded,
+            color: isDark ? AppColors.warning : AppColors.warningLight,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  faceCheckWasSkipped
+                      ? 'Face check not run'
+                      : 'How to read this result',
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  guidance,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

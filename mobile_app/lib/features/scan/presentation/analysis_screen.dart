@@ -28,11 +28,12 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(scanProvider.notifier).reset();
-    ref.read(uploadProgressProvider.notifier).state =
-        const UploadProgressState(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _startScan();
+      if (!mounted) return;
+      ref.read(scanProvider.notifier).reset();
+      ref.read(uploadProgressProvider.notifier).state =
+          const UploadProgressState(0);
+      _startScan();
     });
   }
 

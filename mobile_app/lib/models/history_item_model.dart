@@ -10,6 +10,8 @@ class HistoryItemModel extends Equatable {
   final bool isSafe;
   final DateTime scannedAt;
   final double confidenceScore;
+  final String? thumbnailPath;
+  final Map<String, dynamic>? resultData;
 
   const HistoryItemModel({
     required this.id,
@@ -19,28 +21,56 @@ class HistoryItemModel extends Equatable {
     required this.isSafe,
     required this.scannedAt,
     required this.confidenceScore,
+    this.thumbnailPath,
+    this.resultData,
   });
 
-  factory HistoryItemModel.fromJson(Map<String, dynamic> json) => HistoryItemModel(
-        id: json['id'] as String,
+  factory HistoryItemModel.fromJson(Map<String, dynamic> json) =>
+      HistoryItemModel(
+        id: json['id'] as String? ?? '',
         scanType: scanTypeFromString(json['scan_type'] as String? ?? 'url'),
-        target: json['target'] as String,
-        threatLevel: threatLevelFromString(json['threat_level'] as String? ?? 'safe'),
+        target: json['target'] as String? ?? '',
+        threatLevel:
+            threatLevelFromString(json['threat_level'] as String? ?? 'safe'),
         isSafe: json['is_safe'] as bool? ?? true,
-        scannedAt: DateTime.parse(json['scanned_at'] as String),
+        scannedAt: DateTime.tryParse(json['scanned_at'] as String? ?? '') ??
+            DateTime.now(),
         confidenceScore: (json['confidence_score'] as num?)?.toDouble() ?? 0.0,
+        thumbnailPath: json['thumbnail_path'] as String?,
+        resultData: json['result_data'] is Map
+            ? Map<String, dynamic>.from(json['result_data'] as Map)
+            : null,
       );
 
   /// Build from full ScanResultModel
-  factory HistoryItemModel.fromScanResult(ScanResultModel result) => HistoryItemModel(
-        id: result.id,
-        scanType: result.scanType,
-        target: result.target,
-        threatLevel: result.threatLevel,
-        isSafe: result.isSafe,
-        scannedAt: result.scannedAt,
-        confidenceScore: result.confidenceScore,
-      );
+  factory HistoryItemModel.fromScanResult(
+    ScanResultModel result, {
+    String? id,
+    String? thumbnailPath,
+  }) {
+    final imageChecksFoundNoStrongSignals = !result.isDemo &&
+        result.extraData?['model_task'] == 'ai_generated_image_detection' &&
+        result.extraData?['face_model_task'] ==
+            'face_manipulation_detection' &&
+        result.extraData?['prediction'] == 'no_ai_generation_signal' &&
+        result.extraData?['face_manipulation_prediction'] ==
+            'no_face_manipulation_signal';
+    final isSafe = result.scanType == ScanType.file
+        ? imageChecksFoundNoStrongSignals
+        : result.isSafe;
+
+    return HistoryItemModel(
+      id: id ?? result.id,
+      scanType: result.scanType,
+      target: result.target,
+      threatLevel: result.threatLevel,
+      isSafe: isSafe,
+      scannedAt: result.scannedAt,
+      confidenceScore: result.confidenceScore,
+      thumbnailPath: thumbnailPath,
+      resultData: result.toJson(),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -50,9 +80,11 @@ class HistoryItemModel extends Equatable {
         'is_safe': isSafe,
         'scanned_at': scannedAt.toIso8601String(),
         'confidence_score': confidenceScore,
+        'thumbnail_path': thumbnailPath,
+        'result_data': resultData,
       };
 
   @override
   List<Object?> get props =>
-      [id, scanType, target, threatLevel, isSafe, scannedAt];
+      [id, scanType, target, threatLevel, isSafe, scannedAt, thumbnailPath];
 }

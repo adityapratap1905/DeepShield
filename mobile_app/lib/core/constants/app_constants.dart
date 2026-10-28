@@ -16,6 +16,7 @@ abstract class AppConstants {
   static const String keyUserEmail = 'user_email';
   static const String keyUserId = 'user_id';
   static const String keyUserName = 'user_name';
+  static const String keyScanHistory = 'scan_history_v1';
 
   // ── Animation Durations ─────────────────────────────────────────
   static const Duration durationFast = Duration(milliseconds: 150);
