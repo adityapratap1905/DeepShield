@@ -14,6 +14,8 @@ class FullReportScreen extends StatelessWidget {
 
   const FullReportScreen({super.key, required this.result});
 
+  bool get _isVideo => result.scanType == ScanType.video;
+
   String get _aiCheckSummary => switch (result.extraData?['prediction']) {
         'ai_generated' => 'AI-generation signal found',
         'no_ai_generation_signal' => 'No strong AI-generation signal',
@@ -22,6 +24,11 @@ class FullReportScreen extends StatelessWidget {
 
   String get _status {
     if (result.isDemo) return 'Not analyzed (demo)';
+    if (_isVideo) {
+      return result.extraData?['prediction'] == 'FAKE'
+          ? 'Video deepfake signal found (model estimate)'
+          : 'No strong video deepfake signal (model estimate)';
+    }
     final aiSignal = _aiCheckSummary == 'AI-generation signal found';
     final faceResult =
         result.extraData?['face_manipulation_prediction'] as String?;
@@ -116,9 +123,9 @@ class FullReportScreen extends StatelessWidget {
                   _InfoRow('Target', result.target, isDark),
                   _InfoRow('Type', result.scanType.label, isDark),
                   _InfoRow('Status', _status, isDark),
-                  if (!result.isDemo)
+                  if (!result.isDemo && !_isVideo)
                     _InfoRow('AI-generation check', _aiCheckSummary, isDark),
-                  if (!result.isDemo)
+                  if (!result.isDemo && !_isVideo)
                     _InfoRow(
                         'AI-generation score (not calibrated)',
                         '${(result.confidenceScore * 100).toStringAsFixed(2)}%',
@@ -126,7 +133,29 @@ class FullReportScreen extends StatelessWidget {
                         color: isDark
                             ? AppColors.primary
                             : AppColors.primaryLight),
+                  if (!result.isDemo && _isVideo) ...[
+                    _InfoRow(
+                        'Video result',
+                        '${result.extraData?['prediction'] ?? 'Unavailable'}',
+                        isDark),
+                    _InfoRow(
+                      'Video deepfake score (not calibrated)',
+                      '${(result.confidenceScore * 100).toStringAsFixed(2)}%',
+                      isDark,
+                      color:
+                          isDark ? AppColors.primary : AppColors.primaryLight,
+                    ),
+                    _InfoRow('Frames analyzed',
+                        '${result.extraData?['frames_analyzed'] ?? 0}', isDark),
+                    _InfoRow(
+                        'Aggregation method',
+                        '${result.extraData?['aggregation_method'] ?? 'Unavailable'}',
+                        isDark),
+                    _InfoRow('Frames without a detected face',
+                        '${result.extraData?['no_face_frames'] ?? 0}', isDark),
+                  ],
                   if (!result.isDemo &&
+                      !_isVideo &&
                       result.extraData?['face_manipulation_prediction'] != null)
                     _InfoRow(
                       'Face check',
@@ -139,6 +168,7 @@ class FullReportScreen extends StatelessWidget {
                           : null,
                     ),
                   if (!result.isDemo &&
+                      !_isVideo &&
                       result.extraData?['face_manipulation_probability'] is num)
                     _InfoRow(
                       'Face model score (not calibrated)',
@@ -146,6 +176,7 @@ class FullReportScreen extends StatelessWidget {
                       isDark,
                     ),
                   if (!result.isDemo &&
+                      !_isVideo &&
                       result.extraData?['face_manipulation_prediction'] != null)
                     _InfoRow(
                       'Faces analyzed',

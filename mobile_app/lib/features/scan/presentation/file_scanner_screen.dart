@@ -12,7 +12,8 @@ import '../../../routes/app_router.dart';
 
 /// Photo scanner screen — file picker and analysis handoff.
 class FileScannerScreen extends StatefulWidget {
-  const FileScannerScreen({super.key});
+  final bool initialVideoMode;
+  const FileScannerScreen({super.key, this.initialVideoMode = false});
 
   @override
   State<FileScannerScreen> createState() => _FileScannerScreenState();
@@ -22,15 +23,17 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
   File? _selectedFile;
   String? _fileName;
   int? _fileSize;
+  late bool _videoMode = widget.initialVideoMode;
 
-  static const _supportedExtensions = ['jpg', 'jpeg', 'png'];
-  static const _maxSizeMB = 15;
+  static const _photoExtensions = ['jpg', 'jpeg', 'png'];
+  static const _videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+  int get _maxSizeMB => _videoMode ? 200 : 15;
 
   Future<void> _pickFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: _supportedExtensions,
+        allowedExtensions: _videoMode ? _videoExtensions : _photoExtensions,
         allowMultiple: false,
       );
 
@@ -57,7 +60,7 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
     } catch (_) {
       if (!mounted) return;
       showDSSnackbar(context,
-          message: 'Could not open that photo. Please try again.',
+          message: 'Could not open that media file. Please try again.',
           type: DSSnackbarType.error);
     }
   }
@@ -65,7 +68,8 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
   void _scan() {
     final file = _selectedFile;
     if (file == null) return;
-    context.push(AppRoutes.analysis, extra: {'type': 'file', 'value': file});
+    context.push(AppRoutes.analysis,
+        extra: {'type': _videoMode ? 'video' : 'file', 'value': file});
   }
 
   @override
@@ -80,7 +84,8 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
       backgroundColor: background,
       appBar: AppBar(
         backgroundColor: background,
-        title: Text('Image Manipulation Check',
+        title: Text(
+            _videoMode ? 'Video Deepfake Check' : 'Photo Manipulation Check',
             style: TextStyle(
                 color: textPrimary, fontWeight: FontWeight.w700, fontSize: 20)),
       ),
@@ -91,18 +96,42 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 16),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.image_outlined),
+                    label: Text('Photo'),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.movie_outlined),
+                    label: Text('Video'),
+                  ),
+                ],
+                selected: {_videoMode},
+                onSelectionChanged: (selection) => setState(() {
+                  _videoMode = selection.first;
+                  _selectedFile = null;
+                  _fileName = null;
+                  _fileSize = null;
+                }),
+              ),
+              const SizedBox(height: 20),
               _FileDropZone(
                 file: _selectedFile,
                 fileName: _fileName,
                 fileSize: _fileSize,
                 isDark: isDark,
+                isVideo: _videoMode,
                 onTap: _pickFile,
               ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0),
               const SizedBox(height: 24),
-              _PhotoQualityNotice(isDark: isDark),
+              _MediaQualityNotice(isDark: isDark, isVideo: _videoMode),
               const SizedBox(height: 24),
-              const _SupportedTypes().animate().fadeIn(delay: 200.ms),
+              _SupportedTypes(isVideo: _videoMode)
+                  .animate()
+                  .fadeIn(delay: 200.ms),
               const SizedBox(height: 24),
             ],
           ),
@@ -113,7 +142,7 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
           child: DSButton(
-            label: 'Analyze Photo',
+            label: _videoMode ? 'Analyze Video' : 'Analyze Photo',
             onPressed: _selectedFile == null ? null : _scan,
             isFullWidth: true,
             leadingIcon: Icons.radar_rounded,
@@ -124,10 +153,11 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
   }
 }
 
-class _PhotoQualityNotice extends StatelessWidget {
+class _MediaQualityNotice extends StatelessWidget {
   final bool isDark;
+  final bool isVideo;
 
-  const _PhotoQualityNotice({required this.isDark});
+  const _MediaQualityNotice({required this.isDark, required this.isVideo});
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +179,7 @@ class _PhotoQualityNotice extends StatelessWidget {
               Icon(Icons.tips_and_updates_outlined, color: textColor, size: 18),
               const SizedBox(width: 8),
               Text(
-                'Get a clearer check',
+                isVideo ? 'Choose a useful clip' : 'Get a clearer check',
                 style: TextStyle(
                   color: textColor,
                   fontSize: 14,
@@ -160,7 +190,9 @@ class _PhotoQualityNotice extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Use an original, sharp, well-lit photo with the face unobstructed. Heavy compression or filters can reduce useful detail. If no face is detected, the face check is skipped; that does not mean the image is authentic. Model scores are estimates, not proof.',
+            isVideo
+                ? 'Use a clear clip with visible faces and minimal blur. The detector samples a few frames, so very brief edits may be missed. Its estimate is not proof of authenticity.'
+                : 'Use an original, sharp, well-lit photo with the face unobstructed. Heavy compression or filters can reduce useful detail. If no face is detected, the face check is skipped; that does not mean the image is authentic. Model scores are estimates, not proof.',
             style: TextStyle(color: textColor, fontSize: 13, height: 1.45),
           ),
         ],
@@ -174,6 +206,7 @@ class _FileDropZone extends StatelessWidget {
   final String? fileName;
   final int? fileSize;
   final bool isDark;
+  final bool isVideo;
   final VoidCallback onTap;
 
   const _FileDropZone({
@@ -181,6 +214,7 @@ class _FileDropZone extends StatelessWidget {
     required this.fileName,
     required this.fileSize,
     required this.isDark,
+    required this.isVideo,
     required this.onTap,
   });
 
@@ -192,7 +226,7 @@ class _FileDropZone extends StatelessWidget {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  IconData get _fileIcon => Icons.image_rounded;
+  IconData get _fileIcon => isVideo ? Icons.movie_rounded : Icons.image_rounded;
 
   @override
   Widget build(BuildContext context) {
@@ -215,8 +249,8 @@ class _FileDropZone extends StatelessWidget {
     return Semantics(
       button: true,
       label: hasFile
-          ? 'Selected photo: $fileName. Tap to choose a different photo.'
-          : 'Tap to select a JPG or PNG photo',
+          ? 'Selected ${isVideo ? 'video' : 'photo'}: $fileName. Tap to choose another.'
+          : 'Tap to select a ${isVideo ? 'video' : 'JPG or PNG photo'}',
       onTap: onTap,
       child: ExcludeSemantics(
         child: GestureDetector(
@@ -255,7 +289,7 @@ class _FileDropZone extends StatelessWidget {
                           color: AppColors.warning.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: file == null
+                        child: isVideo || file == null
                             ? Icon(_fileIcon,
                                 color: AppColors.warning, size: 30)
                             : ClipRRect(
@@ -288,7 +322,8 @@ class _FileDropZone extends StatelessWidget {
                       Text(_formatSize(fileSize ?? 0),
                           style: TextStyle(color: textSecondary, fontSize: 13)),
                       const SizedBox(height: 12),
-                      Text('Tap to choose a different photo',
+                      Text(
+                          'Tap to choose a different ${isVideo ? 'video' : 'photo'}',
                           style: TextStyle(color: primary, fontSize: 13)),
                     ],
                   )
@@ -325,14 +360,21 @@ class _FileDropZone extends StatelessWidget {
 }
 
 class _SupportedTypes extends StatelessWidget {
-  const _SupportedTypes();
+  final bool isVideo;
+  const _SupportedTypes({required this.isVideo});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const types = [
-      ('Photos: JPG, PNG', Icons.image_rounded, AppColors.warning),
-    ];
+    final types = isVideo
+        ? [
+            (
+              'Videos: MP4, MOV, AVI, MKV, WebM',
+              Icons.movie_rounded,
+              AppColors.warning
+            )
+          ]
+        : [('Photos: JPG, PNG', Icons.image_rounded, AppColors.warning)];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

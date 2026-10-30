@@ -220,7 +220,7 @@ class _PrimaryScanExperience extends StatelessWidget {
                   isDark: isDark,
                   width: actionWidth,
                   height: actionHeight,
-                  onTap: null,
+                  onTap: () => context.push(AppRoutes.scanFile, extra: 'video'),
                 ),
               ),
             ],

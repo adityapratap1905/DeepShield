@@ -38,7 +38,7 @@ ThreatLevel threatLevelFromString(String s) {
 }
 
 /// Scan type enum
-enum ScanType { url, file, qr }
+enum ScanType { url, file, video, qr }
 
 extension ScanTypeExt on ScanType {
   String get label {
@@ -47,6 +47,8 @@ extension ScanTypeExt on ScanType {
         return 'URL Scan';
       case ScanType.file:
         return 'Photo Scan';
+      case ScanType.video:
+        return 'Video Scan';
       case ScanType.qr:
         return 'QR Scan';
     }
@@ -58,6 +60,8 @@ extension ScanTypeExt on ScanType {
         return '🔗';
       case ScanType.file:
         return '📄';
+      case ScanType.video:
+        return 'VIDEO';
       case ScanType.qr:
         return '📷';
     }
@@ -68,6 +72,8 @@ ScanType scanTypeFromString(String s) {
   switch (s.toLowerCase()) {
     case 'file':
       return ScanType.file;
+    case 'video':
+      return ScanType.video;
     case 'qr':
       return ScanType.qr;
     default:

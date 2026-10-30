@@ -4,7 +4,7 @@ DeepShield analyzes potentially manipulated photos and videos. The repository ke
 
 ## Repository structure
 
-- [`mobile_app/`](mobile_app/): Flutter client. It remains photo-first and uses the existing image endpoint.
+- [`mobile_app/`](mobile_app/): Flutter client for photo analysis and sampled-frame video detection.
 - [`backend/`](backend/): FastAPI upload API, including the existing pretrained photo analysis route and the FF++ image/video routes.
 - [`model/`](model/): preserved pretrained ONNX models plus the FaceForensics++ C23 frame preparation, training, evaluation, and inference pipeline.
 - [`web_app/`](web_app/): standalone Flask image dashboard. `mobile_app/web/` is Flutter platform support, not that dashboard.

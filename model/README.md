@@ -70,6 +70,22 @@ ConvNeXt-Tiny is skipped automatically when CUDA is unavailable. On CPU, use a s
 
 The saved image threshold is selected on validation frames only. Test data is not read during training or model selection.
 
+To continue fine-tuning a compatible selected checkpoint, pass `--initial-checkpoint` and write to a separate output directory:
+
+```powershell
+python scripts/train.py `
+    --view face `
+    --architectures efficientnet_b0 `
+    --initial-checkpoint artifacts/deepfake_image_best.pt `
+    --stage1-epochs 0 `
+    --stage2-epochs 1 `
+    --learning-rate 0.00003 `
+    --output-dir artifacts/experiment-name `
+    --report-dir reports/experiment-name
+```
+
+The continuation path checks the checkpoint architecture and preprocessing mode. Keep each candidate separate, compare validation results first, and run held-out test evaluation before promoting a candidate. Do not choose a checkpoint based on test results.
+
 ## Calibrate and evaluate video detection
 
 ```powershell

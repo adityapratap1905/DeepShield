@@ -244,6 +244,7 @@ def train_one_model(
     weight_decay: float,
     patience: int,
     seed: int,
+    initial_checkpoint: Path | None = None,
 ) -> dict[str, Any]:
     random.seed(seed)
     np.random.seed(seed)
@@ -361,7 +362,17 @@ def train_one_model(
     )
 
     amp_enabled = device.type == "cuda"
-    model = build_model(pretrained=True, name=architecture).to(device)
+    model = build_model(pretrained=initial_checkpoint is None, name=architecture).to(device)
+    if initial_checkpoint is not None:
+        initial = torch.load(initial_checkpoint, map_location="cpu", weights_only=True)
+        if initial.get("architecture") != architecture:
+            raise ValueError(
+                f"Initial checkpoint architecture {initial.get('architecture')!r} "
+                f"does not match {architecture!r}."
+            )
+        if initial.get("preprocessing_mode") != ("face_crop" if view == "face" else "full_frame"):
+            raise ValueError("Initial checkpoint preprocessing mode does not match the selected view.")
+        model.load_state_dict(initial["state_dict"], strict=True)
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
     loss_fn = nn.CrossEntropyLoss()
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
@@ -492,6 +503,7 @@ def train_one_model(
         "configured_epochs": experiment_config["configured_epochs"],
         "augmentations": experiment_config["augmentations"],
         "seed": seed,
+        "initial_checkpoint": str(initial_checkpoint.resolve()) if initial_checkpoint else None,
         "experiment": experiment_config,
         "gpu_peak_memory_mb": (
             round(torch.cuda.max_memory_allocated(device) / (1024 * 1024), 2)

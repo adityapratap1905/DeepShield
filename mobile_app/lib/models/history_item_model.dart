@@ -50,14 +50,15 @@ class HistoryItemModel extends Equatable {
   }) {
     final imageChecksFoundNoStrongSignals = !result.isDemo &&
         result.extraData?['model_task'] == 'ai_generated_image_detection' &&
-        result.extraData?['face_model_task'] ==
-            'face_manipulation_detection' &&
+        result.extraData?['face_model_task'] == 'face_manipulation_detection' &&
         result.extraData?['prediction'] == 'no_ai_generation_signal' &&
         result.extraData?['face_manipulation_prediction'] ==
             'no_face_manipulation_signal';
-    final isSafe = result.scanType == ScanType.file
-        ? imageChecksFoundNoStrongSignals
-        : result.isSafe;
+    final isSafe = switch (result.scanType) {
+      ScanType.file => imageChecksFoundNoStrongSignals,
+      ScanType.video => false,
+      _ => result.isSafe,
+    };
 
     return HistoryItemModel(
       id: id ?? result.id,

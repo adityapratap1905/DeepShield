@@ -26,6 +26,7 @@ abstract class ApiConstants {
   static const String scanUrl = '/scan/url';
   static const String scanFile = '/scan/file';
   static const String scanImage = '/scan/image';
+  static const String detectVideo = '/api/v2/detect/video';
   static const String scanQr = '/scan/qr';
 
   // ── History ─────────────────────────────────────────────────────

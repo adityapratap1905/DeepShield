@@ -319,6 +319,8 @@ class _HistoryCard extends StatelessWidget {
         return Icons.link_rounded;
       case ScanType.file:
         return Icons.insert_drive_file_rounded;
+      case ScanType.video:
+        return Icons.movie_rounded;
       case ScanType.qr:
         return Icons.qr_code_rounded;
     }
@@ -330,6 +332,8 @@ class _HistoryCard extends StatelessWidget {
         return 'URL';
       case ScanType.file:
         return 'FILE';
+      case ScanType.video:
+        return 'VIDEO';
       case ScanType.qr:
         return 'QR';
     }
@@ -377,7 +381,43 @@ class _HistoryCard extends StatelessWidget {
     return (label, color);
   }
 
+  (String, Color) get _videoStatus {
+    final rawExtraData = item.resultData?['extra_data'];
+    final extraData = rawExtraData is Map ? rawExtraData : const {};
+    final prediction = extraData['prediction'];
+    if (prediction == 'FAKE') {
+      return (
+        'Signal found',
+        isDark ? AppColors.danger : AppColors.dangerLight
+      );
+    }
+    if (prediction == 'REAL') {
+      return (
+        'No strong signal',
+        isDark ? AppColors.warning : AppColors.warningLight
+      );
+    }
+    return (
+      'Review result',
+      isDark ? AppColors.warning : AppColors.warningLight
+    );
+  }
+
   Widget _statusBadge() {
+    if (item.scanType == ScanType.video) {
+      final (label, color) = _videoStatus;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                color: color, fontSize: 10, fontWeight: FontWeight.w700)),
+      );
+    }
     if (item.scanType != ScanType.file) {
       return DSBadge(threatLevel: item.threatLevel.name);
     }
@@ -406,7 +446,9 @@ class _HistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final threatColor = item.scanType == ScanType.file
         ? _photoStatus.$2
-        : AppColors.threatColor(item.threatLevel.name);
+        : item.scanType == ScanType.video
+            ? _videoStatus.$2
+            : AppColors.threatColor(item.threatLevel.name);
     final textPrimary =
         isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final textTertiary =

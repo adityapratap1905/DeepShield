@@ -7,7 +7,7 @@ import '../../../core/widgets/ds_aurora_background.dart';
 import '../../../core/widgets/ds_card.dart';
 import '../../../routes/app_router.dart';
 
-/// Scan hub — entry point for the photo analysis MVP.
+/// Scan hub for photo and video analysis.
 class ScanHubScreen extends StatelessWidget {
   const ScanHubScreen({super.key});
 
@@ -48,7 +48,7 @@ class ScanHubScreen extends StatelessWidget {
                       .slideY(begin: 0.2, end: 0),
                   const SizedBox(height: 28),
                   Text(
-                    'Analyze a photo',
+                    'Choose media to analyze',
                     style: TextStyle(
                       color: textPrimary,
                       fontSize: 18,
@@ -70,6 +70,22 @@ class ScanHubScreen extends StatelessWidget {
                       .animate()
                       .fadeIn(delay: 200.ms)
                       .slideX(begin: 0.1, end: 0, delay: 200.ms),
+                  const SizedBox(height: 12),
+                  _ScanTypeCard(
+                    icon: Icons.movie_rounded,
+                    color: AppColors.primary,
+                    title: 'Video Deepfake Check',
+                    subtitle:
+                        'Sample frames from an MP4, MOV, AVI, MKV or WebM clip. Maximum size: 200 MB.',
+                    tag: 'VIDEO · UP TO 200 MB',
+                    tagColor: AppColors.primary,
+                    isDark: isDark,
+                    onTap: () =>
+                        context.push(AppRoutes.scanFile, extra: 'video'),
+                  )
+                      .animate()
+                      .fadeIn(delay: 280.ms)
+                      .slideX(begin: 0.1, end: 0, delay: 280.ms),
                 ]),
               ),
             ),
@@ -121,7 +137,7 @@ class _ScanBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Check a photo',
+                  'Check your media',
                   style: TextStyle(
                     color: textPrimary,
                     fontSize: 20,
@@ -130,7 +146,7 @@ class _ScanBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'See estimates for AI-generated imagery and possible face manipulation. Results are not proof of authenticity.',
+                  'Get separate photo signals or a sampled-frame video estimate. Results are model estimates, not proof of authenticity.',
                   style: TextStyle(
                     color: textSecondary.withValues(alpha: 0.9),
                     fontSize: 13,

@@ -14,7 +14,11 @@ class ScanResultScreen extends StatelessWidget {
   final ScanResultModel result;
   const ScanResultScreen({super.key, required this.result});
 
+  bool get _isVideoScan => result.scanType == ScanType.video;
+  bool get _isPhotoScan => result.scanType == ScanType.file;
+
   bool get _isSafe =>
+      !_isVideoScan &&
       !result.isDemo &&
       _aiPrediction == 'no_ai_generation_signal' &&
       _facePrediction == 'no_face_manipulation_signal';
@@ -44,7 +48,8 @@ class ScanResultScreen extends StatelessWidget {
 
   bool get _hasManipulationSignal =>
       _aiPrediction == 'ai_generated' ||
-      _facePrediction == 'face_manipulation_signal';
+      _facePrediction == 'face_manipulation_signal' ||
+      (_isVideoScan && result.extraData?['prediction'] == 'FAKE');
 
   Color _getPrimaryColor(bool isDark) {
     if (_hasManipulationSignal) {
@@ -63,10 +68,18 @@ class ScanResultScreen extends StatelessWidget {
     );
   }
 
-  IconData get _icon =>
-      _hasManipulationSignal ? Icons.gpp_bad_rounded : Icons.analytics_rounded;
+  IconData get _icon => _hasManipulationSignal
+      ? Icons.gpp_bad_rounded
+      : _isVideoScan
+          ? Icons.movie_filter_rounded
+          : Icons.analytics_rounded;
   String get _verdict {
     if (result.isDemo) return 'Demo Only — No Analysis';
+    if (_isVideoScan) {
+      return result.extraData?['prediction'] == 'FAKE'
+          ? 'Video Deepfake Signal Found'
+          : 'No Strong Video Deepfake Signal';
+    }
     final aiSignal = _aiPrediction == 'ai_generated';
     final faceSignal = _facePrediction == 'face_manipulation_signal';
     if (aiSignal && faceSignal) return 'Multiple Manipulation Signals Found';
@@ -83,6 +96,9 @@ class ScanResultScreen extends StatelessWidget {
     if (result.isDemo) {
       return 'No model analysis was performed, so this result says nothing about the image.';
     }
+    if (_isVideoScan) {
+      return 'A few frames were sampled from this clip. This estimate is not proof of authenticity.';
+    }
     if (_facePrediction == 'no_face_detected') {
       return 'No face was detected, so face manipulation could not be assessed. Model estimates are not proof of authenticity.';
     }
@@ -92,6 +108,8 @@ class ScanResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final expandedHeight = (screenHeight * 0.68).clamp(500.0, 620.0).toDouble();
     final primaryColor = _getPrimaryColor(isDark);
     final background =
         isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
@@ -107,7 +125,7 @@ class ScanResultScreen extends StatelessWidget {
           slivers: [
             // ── Sticky result header ─────────────────────────────────
             SliverAppBar(
-              expandedHeight: 320,
+              expandedHeight: expandedHeight,
               pinned: true,
               backgroundColor: Colors.transparent,
               leading: IconButton(
@@ -124,6 +142,7 @@ class ScanResultScreen extends StatelessWidget {
                   description: _description,
                   confidenceScore:
                       result.isDemo ? null : result.confidenceScore,
+                  isVideoScan: _isVideoScan,
                   isDark: isDark,
                 ),
               ),
@@ -139,6 +158,12 @@ class ScanResultScreen extends StatelessWidget {
                   // Show the separate AI-generation and face-analysis outputs.
                   if (result.isDemo)
                     const _DemoResultNotice()
+                  else if (_isVideoScan)
+                    _VideoAnalysisCard(
+                      result: result,
+                      isDark: isDark,
+                      primaryColor: primaryColor,
+                    )
                   else
                     _ModelScoreCard(
                       score: result.confidenceScore,
@@ -158,7 +183,9 @@ class ScanResultScreen extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  if (!result.isDemo)
+                  if (!result.isDemo && _isVideoScan)
+                    _VideoGuidanceCard(isDark: isDark)
+                  else if (!result.isDemo)
                     _ResultGuidanceCard(
                       faceCheckWasSkipped:
                           _facePrediction == 'no_face_detected',
@@ -186,7 +213,7 @@ class ScanResultScreen extends StatelessWidget {
                           value: _verdict,
                           valueColor: _getPrimaryColor(isDark),
                           isDark: isDark),
-                      if (!result.isDemo)
+                      if (!result.isDemo && _isPhotoScan)
                         _DetailRow(
                           label: 'AI-generation check',
                           value: _aiCheckStatus,
@@ -197,7 +224,7 @@ class ScanResultScreen extends StatelessWidget {
                               : null,
                           isDark: isDark,
                         ),
-                      if (!result.isDemo)
+                      if (!result.isDemo && _isPhotoScan)
                         _DetailRow(
                           label: 'AI-generation score',
                           value: result.confidencePercent,
@@ -206,7 +233,7 @@ class ScanResultScreen extends StatelessWidget {
                               : AppColors.primaryLight,
                           isDark: isDark,
                         ),
-                      if (!result.isDemo) ...[
+                      if (!result.isDemo && _isPhotoScan) ...[
                         _DetailRow(
                           label: 'Face check',
                           value: _faceCheckStatus,
@@ -233,6 +260,26 @@ class ScanResultScreen extends StatelessWidget {
                                 : 'Analyzed $_facesAnalyzed of $_facesDetected detected faces',
                             isDark: isDark,
                           ),
+                      ],
+                      if (!result.isDemo && _isVideoScan) ...[
+                        _DetailRow(
+                          label: 'Video result',
+                          value: result.extraData?['prediction'] as String? ??
+                              'Unavailable',
+                          valueColor: primaryColor,
+                          isDark: isDark,
+                        ),
+                        _DetailRow(
+                          label: 'Frames analyzed',
+                          value: '${result.extraData?['frames_analyzed'] ?? 0}',
+                          isDark: isDark,
+                        ),
+                        _DetailRow(
+                          label: 'Aggregation',
+                          value:
+                              '${result.extraData?['aggregation_method'] ?? 'Unavailable'}',
+                          isDark: isDark,
+                        ),
                       ],
                       _DetailRow(
                           label: 'Scan Time',
@@ -316,6 +363,7 @@ class _ResultHero extends StatelessWidget {
   final String verdict;
   final String description;
   final double? confidenceScore;
+  final bool isVideoScan;
   final bool isDark;
 
   const _ResultHero({
@@ -326,6 +374,7 @@ class _ResultHero extends StatelessWidget {
     required this.verdict,
     required this.description,
     required this.confidenceScore,
+    required this.isVideoScan,
     required this.isDark,
   });
 
@@ -349,7 +398,7 @@ class _ResultHero extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 60, 24, 0),
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -400,7 +449,7 @@ class _ResultHero extends StatelessWidget {
               if (confidenceScore != null) ...[
                 const SizedBox(height: 12),
                 Text(
-                    'AI-generation score: ${(confidenceScore! * 100).toStringAsFixed(1)}% (not calibrated)',
+                    '${isVideoScan ? 'Video deepfake score' : 'AI-generation score'}: ${(confidenceScore! * 100).toStringAsFixed(1)}% (not calibrated)',
                     style: TextStyle(color: textSecondary, fontSize: 13)),
               ],
             ],
@@ -530,6 +579,179 @@ class _ModelScoreCard extends StatelessWidget {
   }
 }
 
+class _VideoAnalysisCard extends StatelessWidget {
+  final ScanResultModel result;
+  final bool isDark;
+  final Color primaryColor;
+
+  const _VideoAnalysisCard({
+    required this.result,
+    required this.isDark,
+    required this.primaryColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final data = result.extraData ?? const <String, dynamic>{};
+    final score = result.confidenceScore.clamp(0.0, 1.0).toDouble();
+    final frames = (data['frames_analyzed'] as num?)?.toInt() ?? 0;
+    final method = data['aggregation_method'] as String? ?? 'frame aggregation';
+    final textPrimary =
+        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    return DSCard(
+      padding: const EdgeInsets.all(20),
+      customBorder:
+          Border.all(color: primaryColor.withValues(alpha: 0.3), width: 1.5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.movie_filter_rounded, color: primaryColor, size: 21),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Video frame analysis',
+                    style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700)),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${data['prediction'] ?? 'UNKNOWN'}',
+                  style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _MetricBar(
+            label: 'Video deepfake score (not calibrated)',
+            score: score,
+            isDark: isDark,
+            primaryColor: primaryColor,
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _VideoMetaPill(
+                icon: Icons.video_library_outlined,
+                label: '$frames frames sampled',
+                color: primaryColor,
+                textColor: textSecondary,
+              ),
+              _VideoMetaPill(
+                icon: Icons.functions_rounded,
+                label: method,
+                color: primaryColor,
+                textColor: textSecondary,
+              ),
+              if (((data['no_face_frames'] as num?)?.toInt() ?? 0) > 0)
+                _VideoMetaPill(
+                  icon: Icons.face_retouching_off_rounded,
+                  label:
+                      '${data['no_face_frames']} frames without a detected face',
+                  color: AppColors.warning,
+                  textColor: textSecondary,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Only selected frames are checked. Short-lived edits between sampled frames may be missed.',
+            style: TextStyle(color: textSecondary, fontSize: 13, height: 1.45),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoMetaPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color textColor;
+
+  const _VideoMetaPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(label,
+                  softWrap: true,
+                  style: TextStyle(
+                      color: textColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ]),
+        ),
+      );
+}
+
+class _VideoGuidanceCard extends StatelessWidget {
+  final bool isDark;
+  const _VideoGuidanceCard({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final text =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    return DSCard(
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(Icons.info_outline_rounded,
+            color: isDark ? AppColors.warning : AppColors.warningLight,
+            size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('How to read this result',
+                style: TextStyle(
+                    color: text, fontSize: 14, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 5),
+            Text(
+              'The detector scores sampled frames and combines them into a clip estimate. It does not inspect every moment, and the score is not a calibrated probability or proof.',
+              style: TextStyle(color: text, fontSize: 13, height: 1.45),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
 class _ResultGuidanceCard extends StatelessWidget {
   final bool faceCheckWasSkipped;
   final bool isDark;
@@ -630,11 +852,14 @@ class _MetricBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label,
-                  style: TextStyle(
-                      color: textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500)),
+              Expanded(
+                child: Text(label,
+                    style: TextStyle(
+                        color: textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500)),
+              ),
+              const SizedBox(width: 12),
               Text('${(score * 100).toInt()}%',
                   style: TextStyle(
                       color: primaryColor,

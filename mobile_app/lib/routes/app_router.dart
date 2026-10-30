@@ -24,28 +24,28 @@ import '../models/scan_result_model.dart';
 
 /// Named route constants to avoid magic strings
 abstract class AppRoutes {
-  static const String splash        = '/';
-  static const String onboarding    = '/onboarding';
-  static const String login         = '/login';
-  static const String register      = '/register';
-  static const String forgotPw      = '/forgot-password';
+  static const String splash = '/';
+  static const String onboarding = '/onboarding';
+  static const String login = '/login';
+  static const String register = '/register';
+  static const String forgotPw = '/forgot-password';
 
   // Shell routes
-  static const String home          = '/home';
-  static const String scan          = '/scan';
-  static const String history       = '/history';
+  static const String home = '/home';
+  static const String scan = '/scan';
+  static const String history = '/history';
   static const String notifications = '/notifications';
-  static const String profile       = '/profile';
+  static const String profile = '/profile';
 
   // Sub-routes
-  static const String scanUrl       = '/scan/url';
-  static const String scanQr        = '/scan/qr';
-  static const String scanFile      = '/scan/file';
-  static const String analysis      = '/scan/analysis';
-  static const String scanResult    = '/scan/result';
-  static const String fullReport    = '/scan/report';
-  static const String settings      = '/settings';
-  static const String reports       = '/reports';
+  static const String scanUrl = '/scan/url';
+  static const String scanQr = '/scan/qr';
+  static const String scanFile = '/scan/file';
+  static const String analysis = '/scan/analysis';
+  static const String scanResult = '/scan/result';
+  static const String fullReport = '/scan/report';
+  static const String settings = '/settings';
+  static const String reports = '/reports';
 }
 
 /// Riverpod provider for GoRouter — allows reactive re-evaluation when auth changes
@@ -83,7 +83,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (!isLoggedIn && protectedRoutes.contains(path)) {
         return AppRoutes.login;
       }
-      if (isLoggedIn && (path == AppRoutes.login || path == AppRoutes.register)) {
+      if (isLoggedIn &&
+          (path == AppRoutes.login || path == AppRoutes.register)) {
         return AppRoutes.home;
       }
       return null;
@@ -149,7 +150,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.scanFile,
-        builder: (_, __) => const FileScannerScreen(),
+        builder: (_, state) => FileScannerScreen(
+          initialVideoMode: state.extra == 'video',
+        ),
       ),
       GoRoute(
         path: AppRoutes.analysis,

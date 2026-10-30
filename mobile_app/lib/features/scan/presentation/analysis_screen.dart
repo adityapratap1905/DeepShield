@@ -24,6 +24,8 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   String? _errorMessage;
 
   bool get _isPhotoScan => widget.payload['type'] == 'file';
+  bool get _isVideoScan => widget.payload['type'] == 'video';
+  bool get _isMediaUpload => _isPhotoScan || _isVideoScan;
 
   @override
   void initState() {
@@ -47,12 +49,14 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       notifier.scanUrl(value);
     } else if (type == 'file' && value is File) {
       notifier.scanFile(value);
+    } else if (type == 'video' && value is File) {
+      notifier.scanVideo(value);
     } else if (type == 'qr' && value is String) {
       notifier.scanQr(value);
     } else {
       setState(() {
         _errorMessage =
-            'This scan could not be started. Return to the photo scanner and choose a JPG or PNG image.';
+            'This scan could not be started. Return to the media scanner and choose a supported file.';
       });
     }
   }
@@ -109,6 +113,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                         textSecondary: textSecondary,
                         scanState: scanState,
                         isPhotoScan: _isPhotoScan,
+                        isVideoScan: _isVideoScan,
                         progress: progress,
                       )
                     : _ErrorContent(
@@ -116,7 +121,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                         isDark: isDark,
                         textPrimary: textPrimary,
                         textSecondary: textSecondary,
-                        canRetry: _isPhotoScan,
+                        canRetry: _isMediaUpload,
                         onRetry: _retry,
                         onBack: () => context.pop(),
                       ),
@@ -135,6 +140,7 @@ class _LoadingContent extends StatelessWidget {
   final Color textSecondary;
   final ScanState scanState;
   final bool isPhotoScan;
+  final bool isVideoScan;
   final double progress;
 
   const _LoadingContent({
@@ -143,6 +149,7 @@ class _LoadingContent extends StatelessWidget {
     required this.textSecondary,
     required this.scanState,
     required this.isPhotoScan,
+    required this.isVideoScan,
     required this.progress,
   });
 
@@ -151,13 +158,17 @@ class _LoadingContent extends StatelessWidget {
     final stageIndex = scanState is ScanSuccess
         ? 3
         : scanState is ScanLoading
-            ? (isPhotoScan && progress >= 1 ? 2 : 1)
+            ? ((isPhotoScan || isVideoScan) && progress >= 1 ? 2 : 1)
             : 0;
     final stageLabel = scanState is ScanSuccess
         ? 'Analysis complete'
         : scanState is ScanLoading
-            ? isPhotoScan
-                ? (progress >= 1 ? 'Analyzing photo' : 'Uploading photo')
+            ? (isPhotoScan || isVideoScan)
+                ? progress >= 1
+                    ? (isVideoScan
+                        ? 'Analyzing video frames'
+                        : 'Analyzing photo')
+                    : (isVideoScan ? 'Uploading video' : 'Uploading photo')
                 : 'Checking source'
             : 'Preparing analysis';
     final reduceMotion = MediaQuery.of(context).disableAnimations;
@@ -285,7 +296,7 @@ class _LoadingContent extends StatelessWidget {
             ),
           ),
         ),
-        if (isPhotoScan && scanState is ScanLoading) ...[
+        if ((isPhotoScan || isVideoScan) && scanState is ScanLoading) ...[
           const SizedBox(height: 24),
           SizedBox(
             width: 220,
@@ -300,7 +311,9 @@ class _LoadingContent extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             progress >= 1
-                ? 'Upload complete · analyzing image'
+                ? (isVideoScan
+                    ? 'Upload complete · analyzing sampled frames'
+                    : 'Upload complete · analyzing image')
                 : '${(progress * 100).round()}% uploaded',
             style: TextStyle(color: textSecondary, fontSize: 12),
           ),

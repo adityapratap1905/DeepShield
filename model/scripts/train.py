@@ -36,6 +36,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--patience", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
+        "--initial-checkpoint", type=Path,
+        help="Continue from a compatible DeepShield checkpoint instead of ImageNet initialization.",
+    )
+    parser.add_argument(
         "--allow-cpu-convnext", action="store_true",
         help="Allow the slow ConvNeXt-Tiny experiment on CPU; it is skipped by default without CUDA.",
     )
@@ -82,6 +86,7 @@ def main() -> None:
             weight_decay=args.weight_decay,
             patience=args.patience,
             seed=args.seed,
+            initial_checkpoint=args.initial_checkpoint,
         )
         results.append(result)
 

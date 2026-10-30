@@ -70,12 +70,21 @@ class ScanNotifier extends StateNotifier<ScanState> {
   }
 
   Future<void> scanFile(File file) async {
+    await _scanUploadedMedia(file, isVideo: false);
+  }
+
+  Future<void> scanVideo(File file) async {
+    await _scanUploadedMedia(file, isVideo: true);
+  }
+
+  Future<void> _scanUploadedMedia(File file, {required bool isVideo}) async {
     state = ScanLoading();
     _ref.read(uploadProgressProvider.notifier).state =
         const UploadProgressState(0);
 
     try {
-      final result = await _repo.scanFile(
+      final scan = isVideo ? _repo.scanVideo : _repo.scanFile;
+      final result = await scan(
         file,
         onProgress: (sent, total) {
           if (total > 0) {
@@ -86,7 +95,10 @@ class ScanNotifier extends StateNotifier<ScanState> {
         },
       );
       try {
-        await _historyRepository.addScanResult(result, sourceFile: file);
+        await _historyRepository.addScanResult(
+          result,
+          sourceFile: isVideo ? null : file,
+        );
         _ref.invalidate(historyProvider);
       } catch (_) {
         // A history write should not discard a completed analysis result.
@@ -95,7 +107,11 @@ class ScanNotifier extends StateNotifier<ScanState> {
     } on Exception catch (e) {
       state = ScanError(e.toString().replaceAll('Exception: ', ''));
     } catch (_) {
-      state = ScanError('File scan failed. Please try again.');
+      state = ScanError(
+        isVideo
+            ? 'Video scan failed. Please try again.'
+            : 'File scan failed. Please try again.',
+      );
     }
   }
 
