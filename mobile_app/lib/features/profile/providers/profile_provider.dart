@@ -12,7 +12,7 @@ final themeProvider = StateNotifierProvider<ThemeNotifier, AppThemeMode>((ref) {
       ? AppThemeMode.light
       : saved == 'system'
           ? AppThemeMode.system
-          : AppThemeMode.dark;
+          : AppThemeMode.light;
   return ThemeNotifier(initial);
 });
 
@@ -25,24 +25,28 @@ class ThemeNotifier extends StateNotifier<AppThemeMode> {
   }
 }
 
-final profileRepositoryProvider = Provider<ProfileRepository>((_) => ProfileRepository());
+final profileRepositoryProvider =
+    Provider<ProfileRepository>((_) => ProfileRepository());
 
-/// User profile state
 abstract class ProfileState {}
+
 class ProfileInitial extends ProfileState {}
+
 class ProfileLoading extends ProfileState {}
+
 class ProfileLoaded extends ProfileState {
   final UserModel user;
   ProfileLoaded(this.user);
 }
+
 class ProfileError extends ProfileState {
   final String message;
   ProfileError(this.message);
 }
 
-final profileProvider = StateNotifierProvider<ProfileNotifier, ProfileState>((ref) {
-  return ProfileNotifier(ref.read(profileRepositoryProvider));
-});
+final profileProvider = StateNotifierProvider<ProfileNotifier, ProfileState>(
+  (ref) => ProfileNotifier(ref.read(profileRepositoryProvider)),
+);
 
 class ProfileNotifier extends StateNotifier<ProfileState> {
   final ProfileRepository _repo;
@@ -51,29 +55,18 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
 
   Future<void> loadProfile() async {
     state = ProfileLoading();
-
-    // Mock data — replace with: final user = await _repo.getProfile();
-    await Future.delayed(const Duration(milliseconds: 600));
-    final storage = StorageService.instance;
-
-    state = ProfileLoaded(UserModel(
-      id: storage.userId.isEmpty ? 'mock-1' : storage.userId,
-      name: storage.userName.isEmpty ? 'Alex Johnson' : storage.userName,
-      email: storage.userEmail.isEmpty ? 'alex@deepshield.io' : storage.userEmail,
-      totalScans: 142,
-      safeScans: 124,
-      fakeScans: 18,
-      authenticityScore: 87,
-      createdAt: DateTime(2024, 1, 15),
-    ));
+    try {
+      state = ProfileLoaded(await _repo.getProfile());
+    } catch (error) {
+      state = ProfileError(error.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
-  Future<void> updateProfile(String name) async {
+  Future<void> updateProfile(String name, {String bio = ''}) async {
     final current = state;
     if (current is! ProfileLoaded) return;
     try {
-      final updated = await _repo.updateProfile(name: name);
-      state = ProfileLoaded(updated);
+      state = ProfileLoaded(await _repo.updateProfile(name: name, bio: bio));
     } catch (_) {
       state = current;
     }

@@ -40,6 +40,13 @@ class StorageService {
     await _secure.delete(key: AppConstants.keyAccessToken);
   }
 
+  Future<void> clearAuthSession() async {
+    await deleteToken();
+    await setLoggedIn(false);
+    await saveUserInfo(name: '', email: '', id: '');
+    await _prefs.remove(AppConstants.keyUserCreatedAt);
+  }
+
   // ── Auth State ───────────────────────────────────────────────────
   Future<void> setLoggedIn(bool value) async {
     await _prefs.setBool(AppConstants.keyIsLoggedIn, value);
@@ -60,14 +67,21 @@ class StorageService {
     await _prefs.setString(AppConstants.keyThemeMode, mode);
   }
 
-  String get themeMode => _prefs.getString(AppConstants.keyThemeMode) ?? 'dark';
+  String get themeMode =>
+      _prefs.getString(AppConstants.keyThemeMode) ?? 'light';
 
   // ── User Info ────────────────────────────────────────────────────
   Future<void> saveUserInfo(
-      {required String name, required String email, required String id}) async {
+      {required String name,
+      required String email,
+      required String id,
+      String? createdAt}) async {
     await _prefs.setString(AppConstants.keyUserName, name);
     await _prefs.setString(AppConstants.keyUserEmail, email);
     await _prefs.setString(AppConstants.keyUserId, id);
+    if (createdAt != null && createdAt.isNotEmpty) {
+      await _prefs.setString(AppConstants.keyUserCreatedAt, createdAt);
+    }
   }
 
   String get userName => _prefs.getString(AppConstants.keyUserName) ?? 'User';

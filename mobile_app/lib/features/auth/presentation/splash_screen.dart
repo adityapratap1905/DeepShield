@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/ds_animated_gradient.dart';
-import '../../../core/widgets/ds_aurora_background.dart';
 import '../../../routes/app_router.dart';
+import '../data/auth_repository.dart';
 
-/// Splash screen — shows animated logo with aurora background, then routes based on auth state
+/// Lightweight launch screen while the saved session is checked.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -15,153 +14,78 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigate();
+    Future<void>.microtask(_navigate);
   }
 
   Future<void> _navigate() async {
-    // Let the animation play
-    await Future.delayed(const Duration(milliseconds: 2800));
-    if (!mounted) return;
-
     final storage = StorageService.instance;
-
     if (!storage.isOnboardingDone) {
-      context.go(AppRoutes.onboarding);
-    } else if (storage.isLoggedIn) {
-      context.go(AppRoutes.home);
-    } else {
-      context.go(AppRoutes.login);
+      if (mounted) context.go(AppRoutes.onboarding);
+      return;
     }
+    final hasSession = await AuthRepository().restoreSession();
+    if (!mounted) return;
+    context.go(hasSession ? AppRoutes.home : AppRoutes.login);
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      body: DSAuroraBackground(
-        child: Stack(
-          children: [
-            // Background radar pulse — violet
-            Center(
-              child: DSRadarPulse(
-                size: 340,
-                color: AppColors.primary.withValues(alpha: 0.15),
-              ),
-            ),
-
-            // Secondary outer pulse ring
-            Center(
-              child: DSRadarPulse(
-                size: 240,
-                color: AppColors.secondary.withValues(alpha: 0.1),
-              ),
-            ),
-
-            // Logo + branding
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // App icon image
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: Image.asset(
-                      'assets/icons/app_icon.png',
-                      width: 110,
-                      height: 110,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                      .animate()
-                      .scale(
-                        begin: const Offset(0.4, 0.4),
-                        end: const Offset(1.0, 1.0),
-                        duration: 750.ms,
-                        curve: Curves.elasticOut,
-                      )
-                      .fadeIn(duration: 500.ms),
-
-                  const SizedBox(height: 32),
-
-                  // App name — DEEP in white, SHIELD in violet
-                  RichText(
-                    text: const TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'DEEP',
-                          style: TextStyle(
-                            color: AppColors.textPrimaryDark,
-                            fontSize: 38,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        TextSpan(
-                          text: 'SHIELD',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 38,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 400.ms, duration: 600.ms)
-                      .slideY(begin: 0.3, end: 0, delay: 400.ms, duration: 500.ms),
-
-                  const SizedBox(height: 10),
-
-                  // Tagline
-                  Text(
-                    'DETECT  •  PROTECT  •  DEFEND',
-                    style: TextStyle(
-                      color: AppColors.primary.withValues(alpha: 0.85),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 2.5,
-                    ),
-                  ).animate().fadeIn(delay: 700.ms, duration: 600.ms),
-
-                  const SizedBox(height: 8),
-
-                  // Sub-tagline
-                  Text(
-                    'AI-Powered Deepfake Detection Platform',
-                    style: TextStyle(
-                      color: AppColors.textSecondaryDark.withValues(alpha: 0.6),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0.3,
-                    ),
-                  ).animate().fadeIn(delay: 900.ms, duration: 600.ms),
-                ],
-              ),
-            ),
-
-            // Version label at the bottom
-            Positioned(
-              bottom: 48,
-              left: 0,
-              right: 0,
-              child: Text(
-                'v1.0.0',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.textTertiaryDark.withValues(alpha: 0.5),
-                  fontSize: 12,
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 104,
+                height: 104,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainerLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: AppColors.primaryLight.withValues(alpha: 0.18)),
                 ),
-              ).animate().fadeIn(delay: 1200.ms),
-            ),
-          ],
+                child: const Icon(Icons.shield_rounded,
+                    color: AppColors.primaryLight, size: 58),
+              ),
+              const SizedBox(height: 18),
+              const Text.rich(
+                TextSpan(children: [
+                  TextSpan(
+                      text: 'Deep',
+                      style: TextStyle(
+                          color: AppColors.textPrimaryLight,
+                          fontWeight: FontWeight.w800)),
+                  TextSpan(
+                      text: 'Shield',
+                      style: TextStyle(
+                          color: AppColors.primaryLight,
+                          fontWeight: FontWeight.w800)),
+                ]),
+                style: TextStyle(fontSize: 30, letterSpacing: -0.7),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Detect. Discuss. Protect.',
+                style: TextStyle(
+                  color: AppColors.textSecondaryLight,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 28),
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primaryLight,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }

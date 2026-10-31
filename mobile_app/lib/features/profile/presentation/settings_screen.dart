@@ -1,261 +1,261 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/constants/app_constants.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/ds_aurora_background.dart';
 import '../../../core/widgets/ds_card.dart';
+import '../../../routes/app_router.dart';
+import '../../history/data/history_repository.dart';
+import '../../social/data/social_repository.dart';
+import '../data/profile_repository.dart';
+import 'profile_preferences_panel.dart';
 import '../providers/profile_provider.dart';
 
-/// Settings screen — theme, notifications, privacy, about
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
+    final profileState = ref.watch(profileProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final background = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final textPrimary = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final textTertiary = isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight;
-    final primary = isDark ? AppColors.primary : AppColors.primaryLight;
-    final success = isDark ? AppColors.success : AppColors.successLight;
-    final warning = isDark ? AppColors.warning : AppColors.warningLight;
-    final danger = isDark ? AppColors.danger : AppColors.dangerLight;
+    final textPrimary =
+        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final accent = isDark ? AppColors.primary : AppColors.primaryLight;
 
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor:
+          isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Text('Settings',
-            style: TextStyle(
-                color: textPrimary, fontSize: 22, fontWeight: FontWeight.w700)),
-        centerTitle: false,
+        title: Text(
+          'Settings',
+          style: TextStyle(color: textPrimary, fontWeight: FontWeight.w700),
+        ),
         leading: IconButton(
+          tooltip: 'Back',
+          onPressed: () => context.pop(),
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: textSecondary),
-          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: DSAuroraBackground(
         subtle: true,
         child: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-        children: [
-          // ── Appearance ──────────────────────────────────────────
-          _SettingsSection(
-            title: 'Appearance',
-            isDark: isDark,
-            children: [
-              _SettingsTile(
-                icon: Icons.dark_mode_rounded,
-                label: 'Theme',
-                isDark: isDark,
-                trailing: _ThemeSegmentedControl(
-                  current: themeMode,
-                  onChanged: (m) => ref.read(themeProvider.notifier).setTheme(m),
-                  isDark: isDark,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+          children: [
+            _SectionTitle('Appearance', color: textSecondary),
+            DSCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Theme',
+                      style: TextStyle(
+                          color: textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  SegmentedButton<AppThemeMode>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                        value: AppThemeMode.dark,
+                        label: Text('Dark'),
+                        icon: Icon(Icons.dark_mode_outlined),
+                      ),
+                      ButtonSegment(
+                        value: AppThemeMode.light,
+                        label: Text('Light'),
+                        icon: Icon(Icons.light_mode_outlined),
+                      ),
+                      ButtonSegment(
+                        value: AppThemeMode.system,
+                        label: Text('System'),
+                        icon: Icon(Icons.settings_suggest_outlined),
+                      ),
+                    ],
+                    selected: {themeMode},
+                    onSelectionChanged: (selection) => ref
+                        .read(themeProvider.notifier)
+                        .setTheme(selection.first),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            _SectionTitle('Privacy & data', color: textSecondary),
+            DSCard(
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Clear scan history?'),
+                    content: const Text(
+                      'This removes saved scan records and thumbnails from this device.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        child: const Text('Clear history'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true) return;
+                await HistoryRepository().clearAllHistory();
+                ref.invalidate(profileProvider);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Scan history cleared.')),
+                );
+              },
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline_rounded, color: accent),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Clear scan history',
+                            style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('Removes saved scans from this device',
+                            style:
+                                TextStyle(color: textSecondary, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: textSecondary),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            _SectionTitle('Privacy & notifications', color: textSecondary),
+            ProfilePreferencesPanel(
+              repository: ref.read(profileRepositoryProvider),
+            ),
+            const SizedBox(height: 24),
+            _SectionTitle('Privacy & safety', color: textSecondary),
+            DSCard(
+              onTap: () => _showBlockedAccounts(context),
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.block_outlined, color: accent),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Blocked accounts',
+                            style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('Review or unblock creators',
+                            style:
+                                TextStyle(color: textSecondary, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: textSecondary),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (profileState is ProfileLoaded &&
+                profileState.user.isModerator) ...[
+              _SectionTitle('Moderation', color: textSecondary),
+              DSCard(
+                onTap: () => context.push(AppRoutes.moderation),
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.shield_outlined, color: accent),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Review reports',
+                              style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text('Triage community reports and remove content',
+                              style: TextStyle(
+                                  color: textSecondary, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: textSecondary),
+                  ],
                 ),
               ),
+              const SizedBox(height: 24),
             ],
-          ).animate().fadeIn(delay: 50.ms),
-
-          const SizedBox(height: 16),
-
-          // ── Notifications ────────────────────────────────────────
-          _SettingsSection(
-            title: 'Notifications',
-            isDark: isDark,
-            children: [
-              _SwitchTile(
-                icon: Icons.notifications_rounded,
-                label: 'Push Notifications',
-                value: true,
-                color: primary,
-                isDark: isDark,
-                onChanged: (_) {},
+            _SectionTitle('Account', color: textSecondary),
+            DSCard(
+              onTap: () => _changePassword(
+                context,
+                ref.read(profileRepositoryProvider),
               ),
-              _SwitchTile(
-                icon: Icons.warning_rounded,
-                label: 'Deepfake Alerts',
-                value: true,
-                color: danger,
-                isDark: isDark,
-                onChanged: (_) {},
-              ),
-              _SwitchTile(
-                icon: Icons.check_circle_rounded,
-                label: 'Scan Completed',
-                value: true,
-                color: success,
-                isDark: isDark,
-                onChanged: (_) {},
-              ),
-            ],
-          ).animate().fadeIn(delay: 100.ms),
-
-          const SizedBox(height: 16),
-
-          // ── Privacy & Security ───────────────────────────────────
-          _SettingsSection(
-            title: 'Privacy & Security',
-            isDark: isDark,
-            children: [
-              _SwitchTile(
-                icon: Icons.fingerprint_rounded,
-                label: 'Biometric Login',
-                value: false,
-                color: warning,
-                isDark: isDark,
-                onChanged: (_) {},
-              ),
-              _SwitchTile(
-                icon: Icons.analytics_rounded,
-                label: 'Share Analytics',
-                value: true,
-                color: primary,
-                isDark: isDark,
-                onChanged: (_) {},
-              ),
-              _SettingsTile(
-                icon: Icons.history_rounded,
-                label: 'Clear Scan History',
-                isDark: isDark,
-                trailing: Icon(Icons.chevron_right_rounded, color: textTertiary),
-                onTap: () {},
-                iconColor: warning,
-              ),
-            ],
-          ).animate().fadeIn(delay: 150.ms),
-
-          const SizedBox(height: 16),
-
-          // ── About ────────────────────────────────────────────────
-          _SettingsSection(
-            title: 'About',
-            isDark: isDark,
-            children: [
-              _SettingsTile(
-                icon: Icons.info_outline_rounded,
-                label: 'App Version',
-                isDark: isDark,
-                trailing: Text('1.0.0',
-                    style: TextStyle(color: textSecondary, fontSize: 13)),
-              ),
-              _SettingsTile(
-                icon: Icons.description_rounded,
-                label: 'Privacy Policy',
-                isDark: isDark,
-                trailing: Icon(Icons.chevron_right_rounded,
-                    color: textTertiary),
-                onTap: () {},
-              ),
-              _SettingsTile(
-                icon: Icons.gavel_rounded,
-                label: 'Terms & Conditions',
-                isDark: isDark,
-                trailing: Icon(Icons.chevron_right_rounded,
-                    color: textTertiary),
-                onTap: () {},
-              ),
-              _SettingsTile(
-                icon: Icons.star_rounded,
-                label: 'Rate the App',
-                isDark: isDark,
-                trailing: Icon(Icons.chevron_right_rounded,
-                    color: textTertiary),
-                onTap: () {},
-                iconColor: warning,
-              ),
-            ],
-          ).animate().fadeIn(delay: 200.ms),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Helper Widgets ────────────────────────────────────────────────
-
-class _SettingsSection extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-  final bool isDark;
-  const _SettingsSection({required this.title, required this.children, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child: Text(title,
-              style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5)),
-        ),
-        DSCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: children.asMap().entries.map((e) {
-              final isLast = e.key == children.length - 1;
-              return Column(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  e.value,
-                  if (!isLast)
-                    Divider(color: isDark ? AppColors.dividerDark : AppColors.dividerLight, height: 1, indent: 56),
+                  Icon(Icons.lock_outline_rounded, color: accent),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Change password',
+                            style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('Update your sign-in password',
+                            style:
+                                TextStyle(color: textSecondary, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: textSecondary),
                 ],
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-  final Color? iconColor;
-  final bool isDark;
-
-  const _SettingsTile({
-    required this.icon,
-    required this.label,
-    required this.isDark,
-    this.trailing,
-    this.onTap,
-    this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon,
-                color: iconColor ?? (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight), size: 20),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(label,
-                  style: TextStyle(
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500)),
+              ),
             ),
-            if (trailing != null) trailing!,
+            const SizedBox(height: 24),
+            _SectionTitle('About', color: textSecondary),
+            DSCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: accent),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('DeepShield',
+                        style: TextStyle(
+                            color: textPrimary, fontWeight: FontWeight.w600)),
+                  ),
+                  Text(AppConstants.appVersion,
+                      style: TextStyle(color: textSecondary, fontSize: 13)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -263,80 +263,234 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-class _SwitchTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool value;
-  final Color color;
-  final void Function(bool) onChanged;
-  final bool isDark;
-
-  const _SwitchTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.onChanged,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _SettingsTile(
-      icon: icon,
-      label: label,
-      iconColor: color,
-      isDark: isDark,
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: color,
-        activeTrackColor: color.withValues(alpha: 0.2),
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+Future<void> _changePassword(
+  BuildContext context,
+  ProfileRepository repository,
+) async {
+  final current = TextEditingController();
+  final next = TextEditingController();
+  final confirm = TextEditingController();
+  String? validationError;
+  try {
+    final values = await showDialog<(String, String)>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Change password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: current,
+                obscureText: true,
+                decoration:
+                    const InputDecoration(labelText: 'Current password'),
+              ),
+              TextField(
+                controller: next,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'New password',
+                  helperText: 'Use at least 8 characters.',
+                ),
+              ),
+              TextField(
+                controller: confirm,
+                obscureText: true,
+                decoration:
+                    const InputDecoration(labelText: 'Confirm new password'),
+                onSubmitted: (_) {
+                  _submitPasswordChange(
+                    dialogContext,
+                    setDialogState,
+                    current,
+                    next,
+                    confirm,
+                    (oldPassword, newPassword) => Navigator.pop(
+                      dialogContext,
+                      (oldPassword, newPassword),
+                    ),
+                    (message) => validationError = message,
+                  );
+                },
+              ),
+              if (validationError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    validationError!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => _submitPasswordChange(
+                dialogContext,
+                setDialogState,
+                current,
+                next,
+                confirm,
+                (oldPassword, newPassword) => Navigator.pop(
+                  dialogContext,
+                  (oldPassword, newPassword),
+                ),
+                (message) => validationError = message,
+              ),
+              child: const Text('Save password'),
+            ),
+          ],
+        ),
       ),
     );
+    if (!context.mounted || values == null) return;
+    await repository.changePassword(
+      currentPassword: values.$1,
+      newPassword: values.$2,
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Password changed successfully.')),
+    );
+  } on DioException catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(DioClient.parseError(error))),
+    );
+  } finally {
+    current.dispose();
+    next.dispose();
+    confirm.dispose();
   }
 }
 
-class _ThemeSegmentedControl extends StatelessWidget {
-  final AppThemeMode current;
-  final void Function(AppThemeMode) onChanged;
-  final bool isDark;
-  const _ThemeSegmentedControl({required this.current, required this.onChanged, required this.isDark});
+Future<void> _showBlockedAccounts(BuildContext context) async {
+  final repository = SocialRepository();
+  var blockedUsers = repository.getBlockedUsers();
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) => AlertDialog(
+        title: const Text('Blocked accounts'),
+        content: SizedBox(
+          width: 380,
+          height: 360,
+          child: FutureBuilder<List<SocialUser>>(
+            future: blockedUsers,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: TextButton.icon(
+                    onPressed: () => setDialogState(
+                        () => blockedUsers = repository.getBlockedUsers()),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Could not load. Retry'),
+                  ),
+                );
+              }
+              final users = snapshot.data ?? const [];
+              if (users.isEmpty) {
+                return const Center(child: Text('No blocked accounts.'));
+              }
+              return ListView.separated(
+                itemCount: users.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final user = users[index];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(user.name),
+                    subtitle: user.bio?.isNotEmpty == true
+                        ? Text(user.bio!,
+                            maxLines: 1, overflow: TextOverflow.ellipsis)
+                        : null,
+                    trailing: TextButton(
+                      onPressed: () async {
+                        try {
+                          await repository.setUserBlocked(user.id, false);
+                          setDialogState(() {
+                            blockedUsers = repository.getBlockedUsers();
+                          });
+                        } on DioException catch (error) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(DioClient.parseError(error))),
+                          );
+                        }
+                      },
+                      child: const Text('Unblock'),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _submitPasswordChange(
+  BuildContext context,
+  StateSetter setState,
+  TextEditingController current,
+  TextEditingController next,
+  TextEditingController confirm,
+  void Function(String current, String next) onSubmit,
+  void Function(String message) saveError,
+) {
+  final currentValue = current.text;
+  final nextValue = next.text;
+  if (currentValue.isEmpty || nextValue.length < 8) {
+    setState(() => saveError(
+        'Enter the current password and a new one with at least 8 characters.'));
+    return;
+  }
+  if (nextValue != confirm.text) {
+    setState(() => saveError('The new passwords do not match.'));
+    return;
+  }
+  if (nextValue == currentValue) {
+    setState(
+        () => saveError('Choose a password different from the current one.'));
+    return;
+  }
+  onSubmit(currentValue, nextValue);
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final Color color;
+
+  const _SectionTitle(this.title, {required this.color});
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: AppThemeMode.values.map((m) {
-        final (icon, label) = switch (m) {
-          AppThemeMode.dark   => (Icons.dark_mode_rounded, 'Dark'),
-          AppThemeMode.light  => (Icons.light_mode_rounded, 'Light'),
-          AppThemeMode.system => (Icons.brightness_auto_rounded, 'Auto'),
-        };
-        final isActive = m == current;
-        final primary = isDark ? AppColors.primary : AppColors.primaryLight;
-        final primaryContainer = isDark ? AppColors.primaryContainer : AppColors.primaryContainerLight;
-        final textTertiary = isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight;
-        
-        return GestureDetector(
-          onTap: () => onChanged(m),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isActive ? primaryContainer : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isActive ? primary.withValues(alpha: 0.4) : Colors.transparent,
-              ),
-            ),
-            child: Icon(icon,
-                size: 18,
-                color: isActive ? primary : textTertiary),
-          ),
-        );
-      }).toList(),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(left: 4, bottom: 10),
+        child: Text(
+          title.toUpperCase(),
+          style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1),
+        ),
+      );
 }

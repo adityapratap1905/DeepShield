@@ -6,10 +6,15 @@ class UserModel extends Equatable {
   final String name;
   final String email;
   final String? avatarUrl;
+  final String? bio;
+  final int postsCount;
+  final int followersCount;
+  final int followingCount;
+  final bool isFollowing;
+  final bool isModerator;
   final int totalScans;
-  final int safeScans;
-  final int fakeScans;
-  final int authenticityScore; // 0–100
+  final int photoScans;
+  final int videoScans;
   final DateTime createdAt;
 
   const UserModel({
@@ -17,10 +22,15 @@ class UserModel extends Equatable {
     required this.name,
     required this.email,
     this.avatarUrl,
+    this.bio,
+    this.postsCount = 0,
+    this.followersCount = 0,
+    this.followingCount = 0,
+    this.isFollowing = false,
+    this.isModerator = false,
     this.totalScans = 0,
-    this.safeScans = 0,
-    this.fakeScans = 0,
-    this.authenticityScore = 100,
+    this.photoScans = 0,
+    this.videoScans = 0,
     required this.createdAt,
   });
 
@@ -30,10 +40,15 @@ class UserModel extends Equatable {
         name: json['name'] as String,
         email: json['email'] as String,
         avatarUrl: json['avatar_url'] as String?,
+        bio: json['bio'] as String?,
+        postsCount: json['posts_count'] as int? ?? 0,
+        followersCount: json['followers_count'] as int? ?? 0,
+        followingCount: json['following_count'] as int? ?? 0,
+        isFollowing: json['is_following'] as bool? ?? false,
+        isModerator: json['is_moderator'] as bool? ?? false,
         totalScans: (json['total_scans'] as int?) ?? 0,
-        safeScans: (json['safe_scans'] as int?) ?? 0,
-        fakeScans: (json['fake_scans'] as int?) ?? 0,
-        authenticityScore: (json['authenticity_score'] as int?) ?? 100,
+        photoScans: (json['photo_scans'] as int?) ?? 0,
+        videoScans: (json['video_scans'] as int?) ?? 0,
         createdAt: DateTime.parse(json['created_at'] as String),
       );
 
@@ -42,10 +57,15 @@ class UserModel extends Equatable {
         'name': name,
         'email': email,
         'avatar_url': avatarUrl,
+        'bio': bio,
+        'posts_count': postsCount,
+        'followers_count': followersCount,
+        'following_count': followingCount,
+        'is_following': isFollowing,
+        'is_moderator': isModerator,
         'total_scans': totalScans,
-        'safe_scans': safeScans,
-        'fake_scans': fakeScans,
-        'authenticity_score': authenticityScore,
+        'photo_scans': photoScans,
+        'video_scans': videoScans,
         'created_at': createdAt.toIso8601String(),
       };
 
@@ -54,10 +74,15 @@ class UserModel extends Equatable {
     String? name,
     String? email,
     String? avatarUrl,
+    String? bio,
+    int? postsCount,
+    int? followersCount,
+    int? followingCount,
+    bool? isFollowing,
+    bool? isModerator,
     int? totalScans,
-    int? safeScans,
-    int? fakeScans,
-    int? authenticityScore,
+    int? photoScans,
+    int? videoScans,
     DateTime? createdAt,
   }) =>
       UserModel(
@@ -65,17 +90,33 @@ class UserModel extends Equatable {
         name: name ?? this.name,
         email: email ?? this.email,
         avatarUrl: avatarUrl ?? this.avatarUrl,
+        bio: bio ?? this.bio,
+        postsCount: postsCount ?? this.postsCount,
+        followersCount: followersCount ?? this.followersCount,
+        followingCount: followingCount ?? this.followingCount,
+        isFollowing: isFollowing ?? this.isFollowing,
+        isModerator: isModerator ?? this.isModerator,
         totalScans: totalScans ?? this.totalScans,
-        safeScans: safeScans ?? this.safeScans,
-        fakeScans: fakeScans ?? this.fakeScans,
-        authenticityScore: authenticityScore ?? this.authenticityScore,
+        photoScans: photoScans ?? this.photoScans,
+        videoScans: videoScans ?? this.videoScans,
         createdAt: createdAt ?? this.createdAt,
       );
 
-  /// Convenience getter
-  int get warningScans => totalScans - safeScans - fakeScans;
-
   @override
-  List<Object?> get props =>
-      [id, name, email, avatarUrl, totalScans, safeScans, fakeScans, authenticityScore, createdAt];
+  List<Object?> get props => [
+        id,
+        name,
+        email,
+        avatarUrl,
+        bio,
+        postsCount,
+        followersCount,
+        followingCount,
+        isFollowing,
+        isModerator,
+        totalScans,
+        photoScans,
+        videoScans,
+        createdAt
+      ];
 }

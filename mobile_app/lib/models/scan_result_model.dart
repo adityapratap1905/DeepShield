@@ -96,6 +96,7 @@ class ScanResultModel extends Equatable {
   final DateTime scannedAt;
   final Map<String, dynamic>? extraData;
   final bool isDemo;
+  final String? sourceMediaPath;
 
   const ScanResultModel({
     required this.id,
@@ -110,6 +111,7 @@ class ScanResultModel extends Equatable {
     required this.scannedAt,
     this.extraData,
     this.isDemo = false,
+    this.sourceMediaPath,
   });
 
   factory ScanResultModel.fromJson(Map<String, dynamic> json) =>
@@ -128,6 +130,7 @@ class ScanResultModel extends Equatable {
             json['scanned_at'] as String? ?? DateTime.now().toIso8601String()),
         extraData: json['extra_data'] as Map<String, dynamic>?,
         isDemo: json['is_demo'] as bool? ?? false,
+        sourceMediaPath: json['source_media_path'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -143,7 +146,29 @@ class ScanResultModel extends Equatable {
         'scanned_at': scannedAt.toIso8601String(),
         'extra_data': extraData,
         'is_demo': isDemo,
+        'source_media_path': sourceMediaPath,
       };
+
+  Map<String, dynamic> toShareReportJson() {
+    final json = toJson()..remove('source_media_path');
+    return json;
+  }
+
+  ScanResultModel copyWith({String? sourceMediaPath}) => ScanResultModel(
+        id: id,
+        scanType: scanType,
+        target: target,
+        threatLevel: threatLevel,
+        confidenceScore: confidenceScore,
+        isSafe: isSafe,
+        reasons: reasons,
+        recommendation: recommendation,
+        scanDurationMs: scanDurationMs,
+        scannedAt: scannedAt,
+        extraData: extraData,
+        isDemo: isDemo,
+        sourceMediaPath: sourceMediaPath ?? this.sourceMediaPath,
+      );
 
   /// Model score as a percentage string.
   String get confidencePercent =>
@@ -158,6 +183,7 @@ class ScanResultModel extends Equatable {
         confidenceScore,
         isSafe,
         scannedAt,
-        isDemo
+        isDemo,
+        sourceMediaPath,
       ];
 }

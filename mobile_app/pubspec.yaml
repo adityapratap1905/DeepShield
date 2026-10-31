@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.4.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -42,6 +42,7 @@ dependencies:
   mobile_scanner: ^5.1.1
   file_picker: ^8.0.3
   image_picker: ^1.1.2
+  video_player: ^2.9.5
 
   # Utils
   equatable: ^2.0.5
@@ -55,6 +56,7 @@ dependencies:
   # Cupertino icons
   cupertino_icons: ^1.0.8
   fl_chart: ^1.2.0
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:

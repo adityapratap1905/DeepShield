@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>DeepShield connects to your development analysis server on the local network.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>DeepShield uses the camera when you choose to capture media for analysis.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>DeepShield uses the microphone when you choose to record a video for analysis.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: deepshield
+      MYSQL_USER: deepshield
+      MYSQL_PASSWORD: deepshield_dev_only
+      MYSQL_ROOT_PASSWORD: deepshield_root_dev_only
+    ports:
+      - "3306:3306"
+    volumes:
+      - deepshield_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pdeepshield_root_dev_only"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  deepshield_mysql:

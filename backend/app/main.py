@@ -17,6 +17,14 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
+try:
+    from .auth import router as auth_router
+    from .database import initialize_database
+    from .social import router as social_router
+except ImportError:  # Support running as `uvicorn main:app` from backend/app.
+    from auth import router as auth_router
+    from database import initialize_database
+    from social import router as social_router
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("deepshield.api")
@@ -62,6 +70,7 @@ Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    initialize_database()
     app.state.classifier = None
     app.state.face_classifier = None
     app.state.model_error = None
@@ -134,14 +143,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="DeepShield API",
-    version="0.1.0",
+    title="DeepShield Social API",
+    version="0.2.0",
     description=(
         "AI-generation and face-manipulation signals for photos, with optional "
         "FaceForensics++ image and sampled-video deepfake detection."
     ),
     lifespan=lifespan,
 )
+app.include_router(auth_router)
+app.include_router(social_router)
 
 cors_origins = [
     origin.strip()
@@ -154,7 +165,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

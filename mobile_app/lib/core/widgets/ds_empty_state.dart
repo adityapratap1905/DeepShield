@@ -21,6 +21,18 @@ class DSEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconBackground =
+        isDark ? AppColors.primaryContainer : AppColors.primaryContainerLight;
+    final border =
+        isDark ? AppColors.cardBorderDark : AppColors.cardBorderLight;
+    final titleColor =
+        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final bodyColor =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final iconColor =
+        isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -31,11 +43,11 @@ class DSEmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.primaryContainer.withValues(alpha: 0.4),
+                color: iconBackground.withValues(alpha: 0.4),
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.cardBorderDark),
+                border: Border.all(color: border),
               ),
-              child: Icon(icon, size: 36, color: AppColors.textTertiaryDark),
+              child: Icon(icon, size: 36, color: iconColor),
             )
                 .animate()
                 .scale(duration: 400.ms, curve: Curves.elasticOut)
@@ -43,18 +55,21 @@ class DSEmptyState extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               title,
-              style: const TextStyle(
-                color: AppColors.textPrimaryDark,
+              style: TextStyle(
+                color: titleColor,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
-            ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0, delay: 200.ms),
+            )
+                .animate()
+                .fadeIn(delay: 200.ms)
+                .slideY(begin: 0.2, end: 0, delay: 200.ms),
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: const TextStyle(
-                color: AppColors.textSecondaryDark,
+              style: TextStyle(
+                color: bodyColor,
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -64,7 +79,11 @@ class DSEmptyState extends StatelessWidget {
               const SizedBox(height: 24),
               TextButton(
                 onPressed: onAction,
-                child: Text(actionLabel!, style: const TextStyle(color: AppColors.primary)),
+                child: Text(actionLabel!,
+                    style: TextStyle(
+                        color: isDark
+                            ? AppColors.primary
+                            : AppColors.primaryLight)),
               ).animate().fadeIn(delay: 400.ms),
             ],
           ],

@@ -8,6 +8,9 @@ import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/shell/main_shell.dart';
 import '../features/dashboard/presentation/home_screen.dart';
+import '../features/explore/presentation/explore_screen.dart';
+import '../features/social/presentation/community_screen.dart';
+import '../features/learn/presentation/learn_screen.dart';
 import '../features/scan/presentation/scan_hub_screen.dart';
 import '../features/scan/presentation/url_scanner_screen.dart';
 import '../features/scan/presentation/qr_scanner_screen.dart';
@@ -20,6 +23,7 @@ import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/profile/presentation/settings_screen.dart';
 import '../features/reports/presentation/reports_screen.dart';
+import '../features/moderation/presentation/moderation_screen.dart';
 import '../models/scan_result_model.dart';
 
 /// Named route constants to avoid magic strings
@@ -32,9 +36,13 @@ abstract class AppRoutes {
 
   // Shell routes
   static const String home = '/home';
+  static const String explore = '/explore';
   static const String scan = '/scan';
+  static const String learn = '/learn';
   static const String history = '/history';
   static const String notifications = '/notifications';
+  static const String communityDetail = '/communities';
+  static String community(String id) => '$communityDetail/$id';
   static const String profile = '/profile';
 
   // Sub-routes
@@ -46,6 +54,7 @@ abstract class AppRoutes {
   static const String fullReport = '/scan/report';
   static const String settings = '/settings';
   static const String reports = '/reports';
+  static const String moderation = '/moderation';
 }
 
 /// Riverpod provider for GoRouter — allows reactive re-evaluation when auth changes
@@ -62,12 +71,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Auth-guarded routes
       const protectedRoutes = [
         AppRoutes.home,
+        AppRoutes.explore,
         AppRoutes.scan,
+        AppRoutes.learn,
         AppRoutes.history,
         AppRoutes.notifications,
         AppRoutes.profile,
         AppRoutes.settings,
         AppRoutes.reports,
+        AppRoutes.moderation,
         AppRoutes.scanUrl,
         AppRoutes.scanQr,
         AppRoutes.scanFile,
@@ -80,7 +92,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (!isOnboardingDone && !path.startsWith('/onboarding')) {
         return AppRoutes.onboarding;
       }
-      if (!isLoggedIn && protectedRoutes.contains(path)) {
+      if (!isLoggedIn &&
+          (protectedRoutes.contains(path) ||
+              path.startsWith('/communities/'))) {
         return AppRoutes.login;
       }
       if (isLoggedIn &&
@@ -121,8 +135,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const HomeScreen(),
           ),
           GoRoute(
+            path: AppRoutes.explore,
+            builder: (_, __) => const ExploreScreen(),
+          ),
+          GoRoute(
             path: AppRoutes.scan,
             builder: (_, __) => const ScanHubScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.learn,
+            builder: (_, state) => LearnScreen(
+              initialCategory: state.extra as String?,
+            ),
+          ),
+          GoRoute(
+            path: '${AppRoutes.communityDetail}/:communityId',
+            builder: (_, state) => CommunityScreen(
+              communityId: state.pathParameters['communityId']!,
+            ),
           ),
           GoRoute(
             path: AppRoutes.history,
@@ -182,6 +212,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.reports,
         builder: (_, __) => const ReportsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.moderation,
+        builder: (_, __) => const ModerationScreen(),
       ),
     ],
   );

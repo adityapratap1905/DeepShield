@@ -9,6 +9,7 @@ import '../../../core/widgets/ds_snackbar.dart';
 import '../../../core/widgets/ds_text_field.dart';
 import '../../../routes/app_router.dart';
 import '../providers/auth_provider.dart';
+import 'auth_mode_tabs.dart';
 
 /// Login screen — email/password with aurora background and glassmorphism
 class LoginScreen extends ConsumerStatefulWidget {
@@ -44,7 +45,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen<AuthState>(authProvider, (_, next) {
       if (next is AuthAuthenticated) context.go(AppRoutes.home);
       if (next is AuthError) {
-        showDSSnackbar(context, message: next.message, type: DSSnackbarType.error);
+        showDSSnackbar(context,
+            message: next.message, type: DSSnackbarType.error);
         ref.read(authProvider.notifier).clearError();
       }
     });
@@ -53,7 +55,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isLoading = authState is AuthLoading;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: AppColors.backgroundLight,
       body: DSAuroraBackground(
         subtle: true,
         child: SafeArea(
@@ -64,7 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
 
                   // App icon image
                   ClipRRect(
@@ -79,22 +81,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   const SizedBox(height: 32),
 
-                  RichText(
-                    text: const TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Welcome back to ',
-                          style: TextStyle(
-                            color: AppColors.textPrimaryDark,
-                            fontSize: 30,
-                            fontWeight: FontWeight.w700,
-                            height: 1.1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.3, end: 0, delay: 100.ms),
-
+                  const Text('Welcome to',
+                      style: TextStyle(
+                          color: AppColors.textPrimaryLight, fontSize: 17)),
                   const SizedBox(height: 4),
 
                   RichText(
@@ -103,8 +92,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         TextSpan(
                           text: 'Deep',
                           style: TextStyle(
-                            color: AppColors.textPrimaryDark,
-                            fontSize: 30,
+                            color: AppColors.textPrimaryLight,
+                            fontSize: 32,
                             fontWeight: FontWeight.w800,
                             height: 1.1,
                           ),
@@ -112,27 +101,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         TextSpan(
                           text: 'Shield',
                           style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 30,
+                            color: AppColors.primaryLight,
+                            fontSize: 32,
                             fontWeight: FontWeight.w800,
                             height: 1.1,
                           ),
                         ),
                       ],
                     ),
-                  ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.3, end: 0, delay: 150.ms),
+                  )
+                      .animate()
+                      .fadeIn(delay: 100.ms)
+                      .slideY(begin: 0.15, end: 0, delay: 100.ms),
 
                   const SizedBox(height: 8),
 
-                  Text(
-                    'Sign in to protect your digital world',
+                  const Text(
+                    'Detect. Discuss. Protect.',
                     style: TextStyle(
-                      color: AppColors.textSecondaryDark.withValues(alpha: 0.8),
+                      color: AppColors.textSecondaryLight,
                       fontSize: 14,
                     ),
                   ).animate().fadeIn(delay: 200.ms),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
+                  const AuthModeTabs(isLogin: true),
+                  const SizedBox(height: 24),
 
                   DSTextField(
                     label: 'Email Address',
@@ -143,14 +137,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textInputAction: TextInputAction.next,
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Email is required';
-                      if (!RegExp(r'^[\w.-]+@[\w.-]+\.[a-z]{2,}$').hasMatch(v)) {
+                      if (!RegExp(r'^[\w.-]+@[\w.-]+\.[a-z]{2,}$')
+                          .hasMatch(v)) {
                         return 'Enter a valid email address';
                       }
                       return null;
                     },
                   ).animate().fadeIn(delay: 300.ms),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
                   DSTextField(
                     label: 'Password',
@@ -174,12 +169,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onPressed: () => context.push(AppRoutes.forgotPw),
                       child: const Text(
                         'Forgot password?',
-                        style: TextStyle(color: AppColors.primary, fontSize: 13),
+                        style: TextStyle(
+                            color: AppColors.primaryLight, fontSize: 13),
                       ),
                     ),
                   ).animate().fadeIn(delay: 450.ms),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
 
                   DSButton(
                     label: 'Sign In',
@@ -189,33 +185,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     leadingIcon: Icons.login_rounded,
                   ).animate().fadeIn(delay: 500.ms),
 
-                  const SizedBox(height: 32),
-
-                  const Row(
-                    children: [
-                      Expanded(child: Divider(color: AppColors.dividerDark)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('or',
-                            style: TextStyle(color: AppColors.textTertiaryDark)),
-                      ),
-                      Expanded(child: Divider(color: AppColors.dividerDark)),
-                    ],
-                  ).animate().fadeIn(delay: 600.ms),
-
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   Center(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text("Don't have an account? ",
-                            style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 14)),
+                            style: TextStyle(
+                                color: AppColors.textSecondaryLight,
+                                fontSize: 14)),
                         GestureDetector(
                           onTap: () => context.go(AppRoutes.register),
                           child: const Text('Sign Up',
                               style: TextStyle(
-                                  color: AppColors.primary,
+                                  color: AppColors.primaryLight,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700)),
                         ),

@@ -1,18 +1,46 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:video_player/video_player.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../core/widgets/ds_aurora_background.dart';
 import '../../../core/widgets/ds_button.dart';
 import '../../../core/widgets/ds_card.dart';
 import '../../../models/scan_result_model.dart';
+import '../../social/data/social_repository.dart';
 import '../../../routes/app_router.dart';
 
 /// Displays the estimate returned by the configured analysis service.
 class ScanResultScreen extends StatelessWidget {
   final ScanResultModel result;
   const ScanResultScreen({super.key, required this.result});
+
+  Future<void> _shareReport(BuildContext context) async {
+    try {
+      await SocialRepository().shareScanReport(result);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Scan report shared to the community feed.')),
+      );
+    } on DioException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(DioClient.parseError(error))),
+      );
+    } on Exception catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
 
   bool get _isVideoScan => result.scanType == ScanType.video;
   bool get _isPhotoScan => result.scanType == ScanType.file;
@@ -59,15 +87,6 @@ class ScanResultScreen extends StatelessWidget {
     return isDark ? AppColors.warning : AppColors.warningLight;
   }
 
-  LinearGradient _getGradient(bool isDark) {
-    final color = _getPrimaryColor(isDark);
-    return LinearGradient(
-      colors: [color.withValues(alpha: 0.8), color.withValues(alpha: 0.1)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
-  }
-
   IconData get _icon => _hasManipulationSignal
       ? Icons.gpp_bad_rounded
       : _isVideoScan
@@ -108,8 +127,6 @@ class ScanResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final expandedHeight = (screenHeight * 0.68).clamp(500.0, 620.0).toDouble();
     final primaryColor = _getPrimaryColor(isDark);
     final background =
         isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
@@ -125,26 +142,16 @@ class ScanResultScreen extends StatelessWidget {
           slivers: [
             // ── Sticky result header ─────────────────────────────────
             SliverAppBar(
-              expandedHeight: expandedHeight,
               pinned: true,
-              backgroundColor: Colors.transparent,
+              backgroundColor: background,
+              title: Text('Scan Result',
+                  style: TextStyle(
+                      color: textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700)),
               leading: IconButton(
-                icon: Icon(Icons.close_rounded, color: textPrimary),
+                icon: Icon(Icons.arrow_back_rounded, color: textPrimary),
                 onPressed: () => context.pop(),
-              ),
-              flexibleSpace: FlexibleSpaceBar(
-                background: _ResultHero(
-                  isSafe: _isSafe,
-                  primaryColor: primaryColor,
-                  gradient: _getGradient(isDark),
-                  icon: _icon,
-                  verdict: _verdict,
-                  description: _description,
-                  confidenceScore:
-                      result.isDemo ? null : result.confidenceScore,
-                  isVideoScan: _isVideoScan,
-                  isDark: isDark,
-                ),
               ),
             ),
 
@@ -154,6 +161,24 @@ class ScanResultScreen extends StatelessWidget {
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 20),
+                  if (result.sourceMediaPath != null)
+                    _LocalMediaPreview(
+                      path: result.sourceMediaPath!,
+                      isVideo: _isVideoScan,
+                    ),
+                  if (result.sourceMediaPath != null)
+                    const SizedBox(height: 16),
+
+                  _ResultHero(
+                    primaryColor: primaryColor,
+                    icon: _icon,
+                    verdict: _verdict,
+                    description: _description,
+                    confidenceScore:
+                        result.isDemo ? null : result.confidenceScore,
+                    isVideoScan: _isVideoScan,
+                  ),
+                  const SizedBox(height: 14),
 
                   // Show the separate AI-generation and face-analysis outputs.
                   if (result.isDemo)
@@ -226,7 +251,7 @@ class ScanResultScreen extends StatelessWidget {
                         ),
                       if (!result.isDemo && _isPhotoScan)
                         _DetailRow(
-                          label: 'AI-generation score',
+                          label: 'AI-generation score (not calibrated)',
                           value: result.confidencePercent,
                           valueColor: isDark
                               ? AppColors.primary
@@ -345,6 +370,26 @@ class ScanResultScreen extends StatelessWidget {
                       ),
                     ],
                   ).animate().fadeIn(delay: 500.ms),
+                  const SizedBox(height: 12),
+                  DSButton(
+                    label: 'Share report and media',
+                    onPressed:
+                        result.isDemo ? null : () => _shareReport(context),
+                    variant: DSButtonVariant.secondary,
+                    isFullWidth: true,
+                    leadingIcon: Icons.share_outlined,
+                  ).animate().fadeIn(delay: 550.ms),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Shares the original scanned file and its report with the community feed.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textTertiaryDark
+                          : AppColors.textTertiaryLight,
+                      fontSize: 11,
+                    ),
+                  ),
                 ]),
               ),
             ),
@@ -355,106 +400,218 @@ class ScanResultScreen extends StatelessWidget {
   }
 }
 
+class _LocalMediaPreview extends StatefulWidget {
+  final String path;
+  final bool isVideo;
+
+  const _LocalMediaPreview({required this.path, required this.isVideo});
+
+  @override
+  State<_LocalMediaPreview> createState() => _LocalMediaPreviewState();
+}
+
+class _LocalMediaPreviewState extends State<_LocalMediaPreview> {
+  VideoPlayerController? _controller;
+  bool _failed = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isVideo) _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    VideoPlayerController? controller;
+    try {
+      controller = VideoPlayerController.file(File(widget.path));
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() {
+        _controller = controller;
+        _loading = false;
+      });
+    } catch (_) {
+      await controller?.dispose();
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textSecondary = Theme.of(context).brightness == Brightness.dark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final controller = _controller;
+    final ratio = controller?.value.aspectRatio ?? 16 / 10;
+    return DSCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(3, 0, 3, 10),
+            child: Text('Scanned media preview',
+                style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600)),
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio:
+                  ratio > 0 ? ratio.clamp(0.6, 2.2).toDouble() : 16 / 10,
+              child: widget.isVideo
+                  ? _videoBody(controller)
+                  : Image.file(
+                      File(widget.path),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _unavailable(),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _videoBody(VideoPlayerController? controller) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_failed || controller == null || !controller.value.isInitialized) {
+      return _unavailable();
+    }
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        VideoPlayer(controller),
+        Material(
+          color: Colors.black26,
+          child: InkWell(
+            onTap: () => setState(() {
+              controller.value.isPlaying
+                  ? controller.pause()
+                  : controller.play();
+            }),
+            child: Center(
+              child: Icon(
+                controller.value.isPlaying
+                    ? Icons.pause_circle_filled_rounded
+                    : Icons.play_circle_fill_rounded,
+                color: Colors.white,
+                size: 54,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 10,
+          right: 10,
+          bottom: 7,
+          child: VideoProgressIndicator(
+            controller,
+            allowScrubbing: true,
+            colors: const VideoProgressColors(
+              playedColor: Colors.white,
+              bufferedColor: Colors.white54,
+              backgroundColor: Colors.white24,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _unavailable() => Container(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        alignment: Alignment.center,
+        child: const Icon(Icons.perm_media_outlined, size: 34),
+      );
+}
+
 class _ResultHero extends StatelessWidget {
-  final bool isSafe;
   final Color primaryColor;
-  final LinearGradient gradient;
   final IconData icon;
   final String verdict;
   final String description;
   final double? confidenceScore;
   final bool isVideoScan;
-  final bool isDark;
 
   const _ResultHero({
-    required this.isSafe,
     required this.primaryColor,
-    required this.gradient,
     required this.icon,
     required this.verdict,
     required this.description,
     required this.confidenceScore,
     required this.isVideoScan,
-    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary =
-        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondary =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPrimary = Theme.of(context).colorScheme.onSurface;
+    final textSecondary = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            primaryColor.withValues(alpha: 0.15),
-            isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+        color: primaryColor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Large icon with glow
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: gradient,
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.4),
-                      blurRadius: 40,
-                      spreadRadius: 8,
-                    ),
-                  ],
-                ),
-                child: Icon(icon, color: Colors.white, size: 48),
-              )
-                  .animate()
-                  .scale(duration: 600.ms, curve: Curves.easeOutBack)
-                  .fadeIn(duration: 400.ms),
-
-              const SizedBox(height: 24),
-
-              Text(
-                verdict,
-                style: TextStyle(
-                  color: textPrimary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
-
-              const SizedBox(height: 8),
-
-              Text(
-                description,
-                style: TextStyle(
-                  color: textSecondary,
-                  fontSize: 15,
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2, end: 0),
-              if (confidenceScore != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                    '${isVideoScan ? 'Video deepfake score' : 'AI-generation score'}: ${(confidenceScore! * 100).toStringAsFixed(1)}% (not calibrated)',
-                    style: TextStyle(color: textSecondary, fontSize: 13)),
-              ],
-            ],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: primaryColor, size: 22),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(verdict,
+                    style: TextStyle(
+                        color: primaryColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 5),
+                Text(description,
+                    style: TextStyle(
+                        color: textSecondary, fontSize: 12, height: 1.45)),
+                if (confidenceScore != null) ...[
+                  const SizedBox(height: 7),
+                  Text(
+                    '${isVideoScan ? 'Video deepfake' : 'AI-generation'} estimate: ${(confidenceScore! * 100).toStringAsFixed(1)}% · not calibrated',
+                    style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

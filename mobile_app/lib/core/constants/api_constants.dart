@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// DeepShield API Endpoint Constants
 ///
 /// Base URL points to the FastAPI backend.
@@ -7,12 +9,16 @@ abstract class ApiConstants {
 
   // ── Base URL ────────────────────────────────────────────────────
   /// Override with --dart-define for a physical device or another environment.
-  /// Use `adb reverse tcp:8000 tcp:8000` for a USB-connected Android phone.
-  /// Android emulators should override this with `http://10.0.2.2:8000/api/v1`.
-  static const String baseUrl = String.fromEnvironment(
-    'DEEPSHIELD_API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000/api/v1',
-  );
+  /// Android emulators use the host's loopback alias; USB phones can use adb reverse.
+  static const String _baseUrlOverride =
+      String.fromEnvironment('DEEPSHIELD_API_BASE_URL');
+  static String get baseUrl {
+    if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000/api/v1';
+    }
+    return 'http://127.0.0.1:8000/api/v1';
+  }
 
   // ── Auth ────────────────────────────────────────────────────────
   static const String login = '/auth/login';
@@ -21,6 +27,12 @@ abstract class ApiConstants {
   static const String resetPassword = '/auth/reset-password';
   static const String refreshToken = '/auth/refresh';
   static const String logout = '/auth/logout';
+  static const String currentUser = '/auth/me';
+  static const String myProfile = '/profiles/me';
+  static const String socialFeed = '/social/feed';
+  static const String socialPosts = '/social/posts';
+  static const String shareScanReport = '/scan-reports/share';
+  static const String communities = '/communities';
 
   // ── Scan ────────────────────────────────────────────────────────
   static const String scanUrl = '/scan/url';
@@ -41,8 +53,8 @@ abstract class ApiConstants {
   // ── Profile ─────────────────────────────────────────────────────
   static const String profile = '/profile';
   static const String updateProfile = '/profile/update';
-  static const String changePassword = '/profile/change-password';
-  static const String uploadAvatar = '/profile/avatar';
+  static const String changePassword = '/profiles/me/password';
+  static const String uploadAvatar = '/profiles/me/avatar';
 
   // ── Header Keys ─────────────────────────────────────────────────
   static const String headerAuthorization = 'Authorization';

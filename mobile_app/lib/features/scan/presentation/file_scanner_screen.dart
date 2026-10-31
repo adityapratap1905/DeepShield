@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/ds_button.dart';
@@ -41,28 +42,59 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
         return;
       }
 
-      final file = File(result.files.single.path!);
-      final size = await file.length();
-      if (!mounted) return;
-
-      if (size > _maxSizeMB * 1024 * 1024) {
-        showDSSnackbar(context,
-            message: 'File exceeds $_maxSizeMB MB limit.',
-            type: DSSnackbarType.error);
-        return;
-      }
-
-      setState(() {
-        _selectedFile = file;
-        _fileName = result.files.single.name;
-        _fileSize = size;
-      });
+      await _selectMedia(
+        File(result.files.single.path!),
+        result.files.single.name,
+      );
     } catch (_) {
       if (!mounted) return;
       showDSSnackbar(context,
           message: 'Could not open that media file. Please try again.',
           type: DSSnackbarType.error);
     }
+  }
+
+  Future<void> _captureFromCamera() async {
+    try {
+      final picker = ImagePicker();
+      final captured = _videoMode
+          ? await picker.pickVideo(source: ImageSource.camera)
+          : await picker.pickImage(
+              source: ImageSource.camera,
+              maxWidth: 4096,
+              maxHeight: 4096,
+              imageQuality: 100,
+            );
+      if (captured == null || !mounted) return;
+      await _selectMedia(File(captured.path), captured.name);
+    } catch (_) {
+      if (!mounted) return;
+      showDSSnackbar(
+        context,
+        message:
+            'Camera capture is unavailable. Check camera permission and try again.',
+        type: DSSnackbarType.error,
+      );
+    }
+  }
+
+  Future<void> _selectMedia(File file, String name) async {
+    final size = await file.length();
+    if (!mounted) return;
+    if (size == 0 || size > _maxSizeMB * 1024 * 1024) {
+      showDSSnackbar(context,
+          message: size == 0
+              ? 'The selected media file is empty.'
+              : 'File exceeds $_maxSizeMB MB limit.',
+          type: DSSnackbarType.error);
+      return;
+    }
+
+    setState(() {
+      _selectedFile = file;
+      _fileName = name;
+      _fileSize = size;
+    });
   }
 
   void _scan() {
@@ -126,6 +158,14 @@ class _FileScannerScreenState extends State<FileScannerScreen> {
                 isVideo: _videoMode,
                 onTap: _pickFile,
               ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _captureFromCamera,
+                icon: Icon(_videoMode
+                    ? Icons.videocam_outlined
+                    : Icons.camera_alt_outlined),
+                label: Text(_videoMode ? 'Record a video' : 'Take a photo'),
+              ),
               const SizedBox(height: 24),
               _MediaQualityNotice(isDark: isDark, isVideo: _videoMode),
               const SizedBox(height: 24),

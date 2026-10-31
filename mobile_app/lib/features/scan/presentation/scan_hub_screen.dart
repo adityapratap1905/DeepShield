@@ -1,285 +1,221 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/ds_aurora_background.dart';
-import '../../../core/widgets/ds_card.dart';
 import '../../../routes/app_router.dart';
 
-/// Scan hub for photo and video analysis.
-class ScanHubScreen extends StatelessWidget {
+/// Scan entry screen for image and video analysis.
+class ScanHubScreen extends StatefulWidget {
   const ScanHubScreen({super.key});
+
+  @override
+  State<ScanHubScreen> createState() => _ScanHubScreenState();
+}
+
+class _ScanHubScreenState extends State<ScanHubScreen> {
+  bool _videoMode = false;
+
+  void _openScanner() =>
+      context.push(AppRoutes.scanFile, extra: _videoMode ? 'video' : null);
+
+  Future<void> _captureFromCamera() async {
+    try {
+      final picker = ImagePicker();
+      final captured = _videoMode
+          ? await picker.pickVideo(source: ImageSource.camera)
+          : await picker.pickImage(
+              source: ImageSource.camera,
+              maxWidth: 4096,
+              maxHeight: 4096,
+              imageQuality: 100,
+            );
+      if (captured == null || !mounted) return;
+      final file = File(captured.path);
+      final size = await file.length();
+      if (!mounted) return;
+      final maxBytes = (_videoMode ? 200 : 15) * 1024 * 1024;
+      if (size == 0 || size > maxBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(size == 0
+              ? 'The captured media is empty.'
+              : 'This media exceeds the ${_videoMode ? 200 : 15} MB limit.'),
+        ));
+        return;
+      }
+      if (!mounted) return;
+      context.push(AppRoutes.analysis,
+          extra: {'type': _videoMode ? 'video' : 'file', 'value': file});
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_videoMode
+            ? 'Video capture is unavailable. Check camera permission.'
+            : 'Camera capture is unavailable. Check camera permission.'),
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary =
+    final foreground =
         isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final accent = isDark ? AppColors.primary : AppColors.primaryLight;
+    final canvas =
+        isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final card = isDark ? AppColors.cardDark : Colors.white;
+    final border =
+        isDark ? AppColors.cardBorderDark : AppColors.cardBorderLight;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-      body: DSAuroraBackground(
-        subtle: true,
-        child: CustomScrollView(
+      backgroundColor: canvas,
+      appBar: AppBar(
+        backgroundColor: canvas,
+        centerTitle: true,
+        title: Text('Scan',
+            style: TextStyle(
+                color: foreground, fontSize: 20, fontWeight: FontWeight.w700)),
+        actions: [
+          IconButton(
+            tooltip: 'Scan history',
+            onPressed: () => context.push(AppRoutes.history),
+            icon: Icon(Icons.history_rounded, color: foreground),
+          ),
+          const SizedBox(width: 6),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: ListView(
           physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverAppBar(
-              backgroundColor: Colors.transparent,
-              pinned: true,
-              title: Text(
-                'Scan',
-                style: TextStyle(
-                  color: textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 120),
+          children: [
+            SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: false, label: Text('Image')),
+                ButtonSegment(value: true, label: Text('Video')),
+              ],
+              selected: {_videoMode},
+              onSelectionChanged: (selection) =>
+                  setState(() => _videoMode = selection.first),
+            ),
+            const SizedBox(height: 18),
+            Material(
+              color: card,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: _openScanner,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 244),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: accent.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _videoMode
+                            ? Icons.video_library_outlined
+                            : Icons.image_outlined,
+                        size: 40,
+                        color: accent,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _videoMode ? 'Upload a video' : 'Upload an image',
+                        style: TextStyle(
+                            color: foreground,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _videoMode
+                            ? 'MP4, MOV, AVI, MKV, WebM · up to 200 MB'
+                            : 'JPG or PNG · up to 15 MB',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: secondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 18),
+                      FilledButton.icon(
+                        onPressed: _openScanner,
+                        icon: const Icon(Icons.add_photo_alternate_outlined),
+                        label: const Text('Choose from gallery'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: accent,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(46),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(13)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              centerTitle: false,
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _ScanBanner(isDark: isDark)
-                      .animate()
-                      .fadeIn(duration: 400.ms)
-                      .slideY(begin: 0.2, end: 0),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Choose media to analyze',
-                    style: TextStyle(
-                      color: textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: Divider(color: border)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('or', style: TextStyle(color: secondary)),
+                ),
+                Expanded(child: Divider(color: border)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: _captureFromCamera,
+              icon: Icon(_videoMode
+                  ? Icons.videocam_outlined
+                  : Icons.camera_alt_outlined),
+              label: Text(_videoMode ? 'Record a video' : 'Take a photo'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: accent,
+                side: BorderSide(color: border),
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13)),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.tips_and_updates_outlined,
+                      color: accent, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _videoMode
+                          ? 'Use a clear clip with visible faces. The service samples frames, so brief edits may be missed.'
+                          : 'Use a clear, original image when possible. A missing face means the face check cannot run.',
+                      style: TextStyle(
+                          color: secondary, fontSize: 12, height: 1.45),
                     ),
-                  ).animate().fadeIn(delay: 150.ms),
-                  const SizedBox(height: 16),
-                  _ScanTypeCard(
-                    icon: Icons.image_rounded,
-                    color: AppColors.warning,
-                    title: 'Photo Scanner',
-                    subtitle:
-                        'Upload a JPG or PNG photo for separate AI-generation and face-manipulation estimates.',
-                    tag: 'JPG · PNG',
-                    tagColor: AppColors.warning,
-                    isDark: isDark,
-                    onTap: () => context.push(AppRoutes.scanFile),
-                  )
-                      .animate()
-                      .fadeIn(delay: 200.ms)
-                      .slideX(begin: 0.1, end: 0, delay: 200.ms),
-                  const SizedBox(height: 12),
-                  _ScanTypeCard(
-                    icon: Icons.movie_rounded,
-                    color: AppColors.primary,
-                    title: 'Video Deepfake Check',
-                    subtitle:
-                        'Sample frames from an MP4, MOV, AVI, MKV or WebM clip. Maximum size: 200 MB.',
-                    tag: 'VIDEO · UP TO 200 MB',
-                    tagColor: AppColors.primary,
-                    isDark: isDark,
-                    onTap: () =>
-                        context.push(AppRoutes.scanFile, extra: 'video'),
-                  )
-                      .animate()
-                      .fadeIn(delay: 280.ms)
-                      .slideX(begin: 0.1, end: 0, delay: 280.ms),
-                ]),
+                  ),
+                ],
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ScanBanner extends StatelessWidget {
-  final bool isDark;
-
-  const _ScanBanner({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = isDark ? AppColors.primary : AppColors.primaryLight;
-    final textPrimary =
-        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondary =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final gradient =
-        isDark ? AppColors.primaryGradientDark : AppColors.primaryGradientLight;
-
-    final cardGradient = isDark
-        ? const LinearGradient(
-            colors: [Color(0xFF1E0A3A), Color(0xFF0A0520)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : LinearGradient(
-            colors: [
-              const Color(0xFFE0F7FA),
-              const Color(0xFFB2EBF2).withValues(alpha: 0.5),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          );
-
-    return DSCard(
-      gradient: cardGradient,
-      customBorder: Border.all(color: primary.withValues(alpha: 0.3)),
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Check your media',
-                  style: TextStyle(
-                    color: textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Get separate photo signals or a sampled-frame video estimate. Results are model estimates, not proof of authenticity.',
-                  style: TextStyle(
-                    color: textSecondary.withValues(alpha: 0.9),
-                    fontSize: 13,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: gradient,
-              boxShadow: [
-                BoxShadow(
-                    color: primary.withValues(alpha: 0.3), blurRadius: 20),
-              ],
-            ),
-            child:
-                const Icon(Icons.shield_rounded, color: Colors.white, size: 28),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScanTypeCard extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final String tag;
-  final Color tagColor;
-  final VoidCallback onTap;
-  final bool isDark;
-
-  const _ScanTypeCard({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.tag,
-    required this.tagColor,
-    required this.onTap,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textPrimary =
-        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondary =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final textTertiary =
-        isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight;
-
-    return Semantics(
-      button: true,
-      label: 'Open photo scanner. $subtitle',
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: DSCard(
-          onTap: onTap,
-          padding: const EdgeInsets.all(18),
-          customBorder: Border.all(color: color.withValues(alpha: 0.2)),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color, size: 26),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: textPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: tagColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            tag,
-                            style: TextStyle(
-                              color: tagColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: textSecondary,
-                        fontSize: 12,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: textTertiary),
-            ],
-          ),
         ),
       ),
     );

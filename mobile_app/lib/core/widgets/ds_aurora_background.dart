@@ -43,6 +43,13 @@ class _DSAuroraBackgroundState extends State<DSAuroraBackground>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    if (!isDark) {
+      return ColoredBox(
+        color: AppColors.backgroundLight,
+        child: widget.child,
+      );
+    }
+
     return Container(
       color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
       child: Stack(
@@ -91,7 +98,8 @@ class _AmbientPainter extends CustomPainter {
     final double w = size.width;
     final double h = size.height;
     final double t = progress * 2 * math.pi;
-    final double opacity = subtle ? (isDark ? 0.15 : 0.4) : (isDark ? 0.25 : 0.6);
+    final double opacity =
+        subtle ? (isDark ? 0.15 : 0.4) : (isDark ? 0.25 : 0.6);
 
     // Orbital Minimal (Dark) or Horizon Wave (Light)
     final color1 = isDark ? const Color(0xFF00E5FF) : const Color(0xFF00B8D4);
@@ -120,7 +128,8 @@ class _AmbientPainter extends CustomPainter {
     _drawOrb(canvas, orb3Center, w * 0.4, color3, opacity * 0.7);
   }
 
-  void _drawOrb(Canvas canvas, Offset center, double radius, Color color, double opacity) {
+  void _drawOrb(Canvas canvas, Offset center, double radius, Color color,
+      double opacity) {
     final paint = Paint()
       ..shader = RadialGradient(
         colors: [

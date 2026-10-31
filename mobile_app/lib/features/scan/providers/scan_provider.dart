@@ -94,16 +94,17 @@ class ScanNotifier extends StateNotifier<ScanState> {
           }
         },
       );
+      final resultWithSource = result.copyWith(sourceMediaPath: file.path);
       try {
         await _historyRepository.addScanResult(
-          result,
+          resultWithSource,
           sourceFile: isVideo ? null : file,
         );
         _ref.invalidate(historyProvider);
       } catch (_) {
         // A history write should not discard a completed analysis result.
       }
-      state = ScanSuccess(result);
+      state = ScanSuccess(resultWithSource);
     } on Exception catch (e) {
       state = ScanError(e.toString().replaceAll('Exception: ', ''));
     } catch (_) {

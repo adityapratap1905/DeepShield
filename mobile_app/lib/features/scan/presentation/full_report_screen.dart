@@ -69,16 +69,6 @@ class FullReportScreen extends StatelessWidget {
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: textPrimary),
           onPressed: () => context.pop(),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.share_rounded, color: textPrimary),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: Icon(Icons.picture_as_pdf_rounded, color: textPrimary),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),

@@ -6,21 +6,31 @@ enum NotificationType { alert, scanComplete, suspicious, system, info }
 extension NotificationTypeExt on NotificationType {
   String get label {
     switch (this) {
-      case NotificationType.alert:        return 'Security Alert';
-      case NotificationType.scanComplete: return 'Scan Complete';
-      case NotificationType.suspicious:   return 'Suspicious Activity';
-      case NotificationType.system:       return 'System';
-      case NotificationType.info:         return 'Info';
+      case NotificationType.alert:
+        return 'Security Alert';
+      case NotificationType.scanComplete:
+        return 'Scan Complete';
+      case NotificationType.suspicious:
+        return 'Suspicious Activity';
+      case NotificationType.system:
+        return 'System';
+      case NotificationType.info:
+        return 'Info';
     }
   }
 
   static NotificationType fromString(String s) {
     switch (s.toLowerCase()) {
-      case 'alert':         return NotificationType.alert;
-      case 'scan_complete': return NotificationType.scanComplete;
-      case 'suspicious':    return NotificationType.suspicious;
-      case 'system':        return NotificationType.system;
-      default:              return NotificationType.info;
+      case 'alert':
+        return NotificationType.alert;
+      case 'scan_complete':
+        return NotificationType.scanComplete;
+      case 'suspicious':
+        return NotificationType.suspicious;
+      case 'system':
+        return NotificationType.system;
+      default:
+        return NotificationType.info;
     }
   }
 }
@@ -45,15 +55,29 @@ class NotificationModel extends Equatable {
     this.payload,
   });
 
-  factory NotificationModel.fromJson(Map<String, dynamic> json) => NotificationModel(
-        id: json['id'] as String,
-        type: NotificationTypeExt.fromString(json['type'] as String? ?? 'info'),
-        title: json['title'] as String,
-        body: json['body'] as String,
-        isRead: json['is_read'] as bool? ?? false,
-        createdAt: DateTime.parse(json['created_at'] as String),
-        payload: json['payload'] as Map<String, dynamic>?,
-      );
+  factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    final actor = json['actor'] as Map<String, dynamic>?;
+    final actorName = actor?['name'] as String? ?? 'Someone';
+    final kind = json['kind'] as String? ?? 'info';
+    final message = switch (kind) {
+      'like' => '$actorName liked your post.',
+      'comment' => '$actorName commented on your post.',
+      'follow' => '$actorName started following you.',
+      _ => 'There is a new community update.',
+    };
+    return NotificationModel(
+      id: json['id'] as String,
+      type: NotificationTypeExt.fromString(kind),
+      title: 'Community update',
+      body: message,
+      isRead: json['is_read'] as bool? ?? false,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      payload: {
+        if (actor != null) 'actor': actor,
+        if (json['post_id'] != null) 'post_id': json['post_id'],
+      },
+    );
+  }
 
   NotificationModel copyWith({bool? isRead}) => NotificationModel(
         id: id,

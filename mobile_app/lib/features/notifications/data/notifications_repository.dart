@@ -1,16 +1,25 @@
+import 'package:dio/dio.dart';
+
+import '../../../core/constants/api_constants.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../models/notification_model.dart';
 
-/// Notifications repository — pure local/mock implementation.
-/// No backend required.
 class NotificationsRepository {
-  /// Returns an empty list. The provider already supplies mock notifications directly.
+  Dio get _dio => DioClient.instance.dio;
+
   Future<List<NotificationModel>> getNotifications() async {
-    return [];
+    final response = await _dio.get(ApiConstants.notifications);
+    final data = response.data;
+    if (data is! List) {
+      throw const FormatException('Invalid notifications response.');
+    }
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(NotificationModel.fromJson)
+        .toList();
   }
 
-  /// No-op: read state is managed locally in the provider.
-  Future<void> markRead(String id) async {}
-
-  /// No-op: read state is managed locally in the provider.
-  Future<void> markAllRead() async {}
+  Future<void> markRead(String id) async {
+    await _dio.post('${ApiConstants.notifications}/$id/read');
+  }
 }

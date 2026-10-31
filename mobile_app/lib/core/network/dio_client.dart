@@ -19,6 +19,7 @@ class DioClient {
 
   late final Dio _dio;
   bool _initialized = false;
+  Future<String?>? _refreshFuture;
 
   Dio get dio {
     assert(
@@ -56,11 +57,31 @@ class DioClient {
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
-          // Handle 401 — attempt token refresh
           if (error.response?.statusCode == ApiConstants.statusUnauthorized) {
-            // In production: call refresh token endpoint here
-            // For now, propagate the error
-            await StorageService.instance.clearAll();
+            final request = error.requestOptions;
+            final isAuthRequest = request.path.endsWith('/auth/login') ||
+                request.path.endsWith('/auth/register') ||
+                request.path.endsWith('/auth/refresh') ||
+                request.path.endsWith('/auth/logout');
+            final alreadyRetried = request.extra['authRetried'] == true;
+            if (!isAuthRequest && !alreadyRetried) {
+              final oldToken = await StorageService.instance.getToken();
+              if (oldToken != null && oldToken.isNotEmpty) {
+                final newToken = await _refreshAccessToken(oldToken);
+                if (newToken != null) {
+                  request.headers[ApiConstants.headerAuthorization] =
+                      'Bearer $newToken';
+                  request.extra['authRetried'] = true;
+                  try {
+                    final response = await _dio.fetch<dynamic>(request);
+                    return handler.resolve(response);
+                  } on DioException catch (retryError) {
+                    return handler.next(retryError);
+                  }
+                }
+              }
+              await StorageService.instance.clearAuthSession();
+            }
           }
           return handler.next(error);
         },
@@ -82,6 +103,37 @@ class DioClient {
     }
 
     _initialized = true;
+  }
+
+  Future<String?> _refreshAccessToken(String token) {
+    return _refreshFuture ??= _performTokenRefresh(token).whenComplete(() {
+      _refreshFuture = null;
+    });
+  }
+
+  Future<String?> _performTokenRefresh(String token) async {
+    try {
+      final refreshClient = Dio(BaseOptions(
+        baseUrl: ApiConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 3),
+        headers: {ApiConstants.headerAccept: 'application/json'},
+      ));
+      final response = await refreshClient.post(
+        ApiConstants.refreshToken,
+        options: Options(headers: {
+          ApiConstants.headerAuthorization: 'Bearer $token',
+        }),
+      );
+      final data = response.data;
+      final newToken =
+          data is Map<String, dynamic> ? data['access_token'] as String? : null;
+      if (newToken == null || newToken.isEmpty) return null;
+      await StorageService.instance.saveToken(newToken);
+      return newToken;
+    } on DioException {
+      return null;
+    }
   }
 
   /// Parse DioException into a human-readable message

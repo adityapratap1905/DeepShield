@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/services/storage_service.dart';
 import 'core/network/dio_client.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/profile/providers/profile_provider.dart';
 import 'routes/app_router.dart';
@@ -17,10 +18,10 @@ Future<void> main() async {
   ]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    statusBarBrightness: Brightness.dark,
-    systemNavigationBarColor: Color(0xFF050508),
-    systemNavigationBarIconBrightness: Brightness.light,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+    systemNavigationBarColor: Color(0xFFF6F9FE),
+    systemNavigationBarIconBrightness: Brightness.dark,
   ));
 
   // ── Initialize Services ───────────────────────────────────────────
@@ -51,7 +52,7 @@ class DeepShieldApp extends ConsumerWidget {
 
     return MaterialApp.router(
       // ── App Info ──────────────────────────────────────────────
-      title: 'DeepShield',
+      title: 'DeepShield Social',
       debugShowCheckedModeBanner: false,
 
       // ── Routing ───────────────────────────────────────────────
@@ -61,18 +62,35 @@ class DeepShieldApp extends ConsumerWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: materialThemeMode,
+      themeAnimationDuration: const Duration(milliseconds: 180),
 
       // ── Builder — global scaffold messenger ───────────────────
       builder: (context, child) {
-        return MediaQuery(
-          // Prevent font scaling beyond 1.2x for layout safety
-          data: MediaQuery.of(context).copyWith(
-            textScaler: MediaQuery.of(context).textScaler.clamp(
-                  minScaleFactor: 0.8,
-                  maxScaleFactor: 1.2,
-                ),
+        final systemBrightness = MediaQuery.platformBrightnessOf(context);
+        final isDark = materialThemeMode == ThemeMode.dark ||
+            (materialThemeMode == ThemeMode.system &&
+                systemBrightness == Brightness.dark);
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
+            statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+            systemNavigationBarColor:
+                isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+            systemNavigationBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
           ),
-          child: child!,
+          child: MediaQuery(
+            // Prevent font scaling beyond 1.2x for layout safety
+            data: MediaQuery.of(context).copyWith(
+              textScaler: MediaQuery.of(context).textScaler.clamp(
+                    minScaleFactor: 0.8,
+                    maxScaleFactor: 1.2,
+                  ),
+            ),
+            child: child!,
+          ),
         );
       },
     );

@@ -24,8 +24,8 @@ class DSCard extends StatelessWidget {
     required this.child,
     this.padding,
     this.margin,
-    this.glass = true,
-    this.hasShadow = false,
+    this.glass = false,
+    this.hasShadow = true,
     this.hasGlow = false,
     this.glowColor,
     this.backgroundColor,
@@ -46,8 +46,10 @@ class DSCard extends StatelessWidget {
             ? (isDark ? AppColors.glassDark : AppColors.glassWhite)
             : (isDark ? AppColors.cardDark : AppColors.cardLight));
 
-    final effectiveBorderColor = isDark ? AppColors.cardBorderDark : AppColors.cardBorderLight;
-    final glassBorderColor = isDark ? AppColors.glassBorderDark : AppColors.glassBorderLight;
+    final effectiveBorderColor =
+        isDark ? AppColors.cardBorderDark : AppColors.cardBorderLight;
+    final glassBorderColor =
+        isDark ? AppColors.glassBorderDark : AppColors.glassBorderLight;
 
     final effectiveBorder = customBorder ??
         Border.all(
@@ -60,7 +62,9 @@ class DSCard extends StatelessWidget {
       width: width,
       margin: margin,
       decoration: BoxDecoration(
-        color: gradient != null ? null : (glass ? Colors.transparent : effectiveBg),
+        color: gradient != null
+            ? null
+            : (glass ? Colors.transparent : effectiveBg),
         gradient: gradient,
         borderRadius: BorderRadius.circular(borderRadius),
         border: effectiveBorder,
@@ -68,7 +72,9 @@ class DSCard extends StatelessWidget {
             ? [
                 if (hasShadow)
                   BoxShadow(
-                    color: isDark ? Colors.black.withValues(alpha: 0.4) : AppColors.secondary.withValues(alpha: 0.05),
+                    color: isDark
+                        ? Colors.black.withValues(alpha: 0.4)
+                        : AppColors.secondary.withValues(alpha: 0.05),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),

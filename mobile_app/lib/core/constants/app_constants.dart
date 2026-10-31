@@ -2,9 +2,9 @@
 abstract class AppConstants {
   AppConstants._();
 
-  static const String appName = 'DeepShield';
+  static const String appName = 'DeepShield Social';
   static const String appVersion = '1.0.0';
-  static const String appTagline = 'Photo & Video Deepfake Detection';
+  static const String appTagline = 'Detect. Discuss. Protect.';
 
   // ── Shared Preferences Keys ─────────────────────────────────────
   static const String keyIsLoggedIn = 'is_logged_in';
@@ -16,6 +16,7 @@ abstract class AppConstants {
   static const String keyUserEmail = 'user_email';
   static const String keyUserId = 'user_id';
   static const String keyUserName = 'user_name';
+  static const String keyUserCreatedAt = 'user_created_at';
   static const String keyScanHistory = 'scan_history_v1';
 
   // ── Animation Durations ─────────────────────────────────────────

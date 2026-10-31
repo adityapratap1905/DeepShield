@@ -23,6 +23,10 @@
 **/.pytest_cache/
 **/.mypy_cache/
 **/.ruff_cache/
+backend/.env
+backend/.env.*.local
+backend/data/*.sqlite3*
+backend/data/private_media/
 desktop.ini
 **/desktop.ini
 web_app/.venv/

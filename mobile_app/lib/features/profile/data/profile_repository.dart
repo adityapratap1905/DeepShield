@@ -1,56 +1,143 @@
-import '../../../core/services/storage_service.dart';
-import '../../../models/user_model.dart';
+import 'dart:io';
 
-/// Profile repository — pure local/mock implementation.
-/// No backend required. Reads/writes to SharedPreferences.
+import 'package:dio/dio.dart';
+
+import '../../../core/constants/api_constants.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/services/storage_service.dart';
+import '../../../models/scan_result_model.dart';
+import '../../../models/user_model.dart';
+import '../../history/data/history_repository.dart';
+
+class AccountPreferences {
+  final bool showInCreatorSearch;
+  final bool notifyLikes;
+  final bool notifyComments;
+  final bool notifyFollows;
+
+  const AccountPreferences({
+    required this.showInCreatorSearch,
+    required this.notifyLikes,
+    required this.notifyComments,
+    required this.notifyFollows,
+  });
+
+  factory AccountPreferences.fromJson(Map<String, dynamic> json) =>
+      AccountPreferences(
+        showInCreatorSearch: json['show_in_creator_search'] as bool? ?? true,
+        notifyLikes: json['notify_likes'] as bool? ?? true,
+        notifyComments: json['notify_comments'] as bool? ?? true,
+        notifyFollows: json['notify_follows'] as bool? ?? true,
+      );
+
+  AccountPreferences withValue(String key, bool value) => switch (key) {
+        'show_in_creator_search' => AccountPreferences(
+            showInCreatorSearch: value,
+            notifyLikes: notifyLikes,
+            notifyComments: notifyComments,
+            notifyFollows: notifyFollows),
+        'notify_likes' => AccountPreferences(
+            showInCreatorSearch: showInCreatorSearch,
+            notifyLikes: value,
+            notifyComments: notifyComments,
+            notifyFollows: notifyFollows),
+        'notify_comments' => AccountPreferences(
+            showInCreatorSearch: showInCreatorSearch,
+            notifyLikes: notifyLikes,
+            notifyComments: value,
+            notifyFollows: notifyFollows),
+        'notify_follows' => AccountPreferences(
+            showInCreatorSearch: showInCreatorSearch,
+            notifyLikes: notifyLikes,
+            notifyComments: notifyComments,
+            notifyFollows: value),
+        _ => this,
+      };
+
+  Map<String, bool> toJson() => {
+        'show_in_creator_search': showInCreatorSearch,
+        'notify_likes': notifyLikes,
+        'notify_comments': notifyComments,
+        'notify_follows': notifyFollows,
+      };
+}
+
 class ProfileRepository {
+  Dio get _dio => DioClient.instance.dio;
+
   Future<UserModel> getProfile() async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final storage = StorageService.instance;
-    return UserModel(
-      id: storage.userId.isEmpty ? 'local_user' : storage.userId,
-      name: storage.userName.isEmpty ? 'User' : storage.userName,
-      email: storage.userEmail.isEmpty ? 'user@example.com' : storage.userEmail,
-      totalScans: 42,
-      safeScans: 38,
-      fakeScans: 4,
-      authenticityScore: 92,
-      createdAt: DateTime.now().subtract(const Duration(days: 30)),
+    final response = await _dio.get(ApiConstants.myProfile);
+    if (response.data is! Map<String, dynamic>) {
+      throw const FormatException('Invalid profile response.');
+    }
+    final profile = UserModel.fromJson(response.data as Map<String, dynamic>);
+    final scans = await HistoryRepository().getHistory(page: 1, limit: 100);
+    final photoScans =
+        scans.where((item) => item.scanType == ScanType.file).length;
+    final videoScans =
+        scans.where((item) => item.scanType == ScanType.video).length;
+    final user = profile.copyWith(
+      totalScans: scans.length,
+      photoScans: photoScans,
+      videoScans: videoScans,
     );
+    await StorageService.instance.saveUserInfo(
+      name: user.name,
+      email: user.email,
+      id: user.id,
+      createdAt: user.createdAt.toIso8601String(),
+    );
+    return user;
   }
 
-  Future<UserModel> updateProfile({required String name}) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final storage = StorageService.instance;
-    await storage.saveUserInfo(
-      name: name,
-      email: storage.userEmail,
-      id: storage.userId,
+  Future<UserModel> updateProfile(
+      {required String name, String bio = ''}) async {
+    final response = await _dio.patch(
+      ApiConstants.myProfile,
+      data: {'name': name.trim(), 'bio': bio.trim()},
     );
+    if (response.data is! Map<String, dynamic>) {
+      throw const FormatException('Invalid profile response.');
+    }
     return getProfile();
   }
 
-  Future<void> changePassword({
-    required String currentPassword,
-    required String newPassword,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    // In a real app this would validate the current password.
-    // For demo purposes, any non-empty newPassword is accepted.
-    if (newPassword.length < 6) {
-      throw Exception('New password must be at least 6 characters.');
-    }
-    // Update stored password if registration data exists
-    final storage = StorageService.instance;
-    final email = storage.userEmail.toLowerCase();
-    if (email.isNotEmpty) {
-      await storage.setString('reg_password_$email', newPassword);
-    }
+  Future<void> changePassword(
+      {required String currentPassword, required String newPassword}) async {
+    await _dio.post(ApiConstants.changePassword, data: {
+      'current_password': currentPassword,
+      'new_password': newPassword,
+    });
   }
 
-  Future<String?> uploadAvatar(dynamic imageFile) async {
-    // Avatar upload is a no-op in the mock implementation.
-    await Future.delayed(const Duration(milliseconds: 800));
-    return null;
+  Future<void> uploadAvatar(File imageFile) async {
+    final filename = imageFile.uri.pathSegments.isEmpty
+        ? 'avatar.png'
+        : imageFile.uri.pathSegments.last;
+    await _dio.post(
+      ApiConstants.uploadAvatar,
+      data: FormData.fromMap({
+        'file':
+            await MultipartFile.fromFile(imageFile.path, filename: filename),
+      }),
+    );
+  }
+
+  Future<AccountPreferences> getAccountPreferences() async {
+    final response = await _dio.get('/profiles/me/settings');
+    if (response.data is! Map<String, dynamic>) {
+      throw const FormatException('Invalid account settings response.');
+    }
+    return AccountPreferences.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AccountPreferences> updateAccountPreferences(
+    Map<String, bool> changes,
+  ) async {
+    final response = await _dio.patch('/profiles/me/settings', data: changes);
+    if (response.data is! Map<String, dynamic>) {
+      throw const FormatException('Invalid account settings response.');
+    }
+    return AccountPreferences.fromJson(response.data as Map<String, dynamic>);
   }
 }
