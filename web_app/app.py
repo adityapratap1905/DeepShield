@@ -1,35 +1,40 @@
 
-"""Standalone Flask dashboard for the bundled image classifier."""
+"""Standalone Flask website for DeepShield image analysis."""
 
 import io
+import json
 import os
 import threading
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest, urlopen
 
 import numpy as np
 import tensorflow as tf
 from PIL import Image, ImageOps, UnidentifiedImageError
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, Response, request, jsonify, render_template, send_from_directory
 
 # -----------------------------------
 # DeepShield configuration
 # -----------------------------------
 
 app = Flask(__name__)
+BASE_DIR = Path(__file__).resolve().parent
 app.config["MAX_CONTENT_LENGTH"] = int(
-    os.getenv("DEEPSHIELD_WEB_MAX_IMAGE_BYTES", str(10 * 1024 * 1024))
+    os.getenv("DEEPSHIELD_WEB_PROXY_MAX_BYTES", str(210 * 1024 * 1024))
 )
 
-BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = Path(
     os.getenv("DEEPSHIELD_WEB_MODEL_PATH", str(BASE_DIR.parent / "model" / "deepshield_final.keras"))
 )
 
 IMAGE_SIZE = (224, 224)
-MAX_IMAGE_SIZE = app.config["MAX_CONTENT_LENGTH"]
+MAX_IMAGE_SIZE = int(os.getenv("DEEPSHIELD_WEB_MAX_IMAGE_BYTES", str(10 * 1024 * 1024)))
 MAX_IMAGE_PIXELS = 40_000_000
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 PREDICTION_LOCK = threading.Lock()
+AUTH_API_BASE_URL = os.getenv("DEEPSHIELD_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+SPA_DIST_DIR = BASE_DIR / "static" / "site"
 
 # -----------------------------------
 # Load trained model
@@ -84,7 +89,123 @@ def predict_image(image):
 
 @app.route("/")
 def home():
+    built_index = SPA_DIST_DIR / "index.html"
+    if built_index.is_file():
+        return send_from_directory(SPA_DIST_DIR, "index.html")
     return render_template("index.html")
+
+
+# -----------------------------------
+# React website API proxy
+# -----------------------------------
+
+API_METHODS = {
+    "health": "GET",
+    "v1/auth/register": "POST",
+    "v1/auth/login": "POST",
+    "v1/auth/me": "GET",
+    "v1/auth/logout": "POST",
+    "v1/scan/image": "POST",
+    "v2/detect/image": "POST",
+    "v2/detect/video": "POST",
+}
+
+
+@app.route("/api/<path:api_path>", methods=["GET", "POST"])
+def proxy_api(api_path):
+    expected_method = API_METHODS.get(api_path)
+    if expected_method is None:
+        return jsonify({"detail": "API route not found."}), 404
+    if request.method != expected_method:
+        return jsonify({"detail": "Method not allowed."}), 405
+
+    headers = {"Accept": "application/json"}
+    authorization = request.headers.get("Authorization")
+    if authorization:
+        headers["Authorization"] = authorization
+    if request.content_type:
+        headers["Content-Type"] = request.content_type
+
+    body = request.get_data(cache=False) if request.method == "POST" else None
+    upstream_path = "/health" if api_path == "health" else f"/api/{api_path}"
+    upstream_request = UrlRequest(
+        f"{AUTH_API_BASE_URL}{upstream_path}",
+        data=body,
+        headers=headers,
+        method=expected_method,
+    )
+    timeout = 600 if api_path in {"v1/scan/image", "v2/detect/image", "v2/detect/video"} else 20
+
+    try:
+        with urlopen(upstream_request, timeout=timeout) as upstream_response:
+            response_body = upstream_response.read()
+            response_status = upstream_response.status
+            response_type = upstream_response.headers.get("Content-Type", "application/json")
+    except HTTPError as error:
+        response_body = error.read()
+        response_status = error.code
+        response_type = error.headers.get("Content-Type", "application/json")
+    except (URLError, TimeoutError, OSError):
+        return jsonify({
+            "detail": "Could not reach DeepShield FastAPI. Start the backend and try again."
+        }), 503
+
+    return Response(response_body, status=response_status, content_type=response_type)
+
+
+# -----------------------------------
+# Existing backend authentication proxy
+# -----------------------------------
+
+@app.route("/auth/<string:action>", methods=["GET", "POST"])
+def proxy_auth(action):
+    allowed_methods = {
+        "register": "POST",
+        "login": "POST",
+        "me": "GET",
+        "logout": "POST",
+    }
+    expected_method = allowed_methods.get(action)
+    if expected_method is None:
+        return jsonify({"error": "Authentication action not found."}), 404
+    if request.method != expected_method:
+        return jsonify({"error": "Method not allowed."}), 405
+
+    headers = {"Accept": "application/json"}
+    authorization = request.headers.get("Authorization")
+    if authorization:
+        headers["Authorization"] = authorization
+
+    body = None
+    if request.method == "POST" and action in {"register", "login"}:
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify({"error": "Send account details as JSON."}), 400
+        body = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    upstream_request = UrlRequest(
+        f"{AUTH_API_BASE_URL}/api/v1/auth/{action}",
+        data=body,
+        headers=headers,
+        method=expected_method,
+    )
+
+    try:
+        with urlopen(upstream_request, timeout=15) as upstream_response:
+            response_body = upstream_response.read()
+            response_status = upstream_response.status
+            response_type = upstream_response.headers.get("Content-Type", "application/json")
+    except HTTPError as error:
+        response_body = error.read()
+        response_status = error.code
+        response_type = error.headers.get("Content-Type", "application/json")
+    except (URLError, TimeoutError, OSError):
+        return jsonify({
+            "error": "Could not reach DeepShield authentication. Start the backend and try again."
+        }), 503
+
+    return Response(response_body, status=response_status, content_type=response_type)
 
 
 # -----------------------------------
@@ -161,7 +282,7 @@ def predict():
 @app.errorhandler(413)
 def file_too_large(error):
     return jsonify({
-        "error": "Image must be 10 MB or smaller."
+        "error": "Uploaded file exceeds the website upload limit."
     }), 413
 
 
